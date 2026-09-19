@@ -2,6 +2,13 @@ import * as React from 'react'
 import { readFile, writeFile } from 'fs/promises'
 import { DiffHeader } from '../diff/diff-header'
 import {
+  MarkdownPreview,
+  isMarkdownFile,
+  markdownPreviewKey,
+} from '../diff/markdown-preview'
+import { Emoji } from '../../lib/emoji'
+import { getBoolean, setBoolean } from '../../lib/local-storage'
+import {
   DiffSelection,
   DiffType,
   IDiff,
@@ -76,10 +83,14 @@ interface IChangesProps {
 
   /** Called when the user opens the diff options popover */
   readonly onDiffOptionsOpened: () => void
+
+  /** Map from the emoji shortcut (e.g., :+1:) to the image's local path. */
+  readonly emoji: Map<string, Emoji>
 }
 
 interface IChangesState {
   readonly isEditingFile: boolean
+  readonly isPreviewingFile: boolean
   readonly isLoadingEditor: boolean
   readonly isSavingEditor: boolean
   readonly editorText: string
@@ -93,6 +104,7 @@ export class Changes extends React.Component<IChangesProps, IChangesState> {
 
     this.state = {
       isEditingFile: false,
+      isPreviewingFile: getBoolean(markdownPreviewKey, false),
       isLoadingEditor: false,
       isSavingEditor: false,
       editorText: '',
@@ -118,6 +130,24 @@ export class Changes extends React.Component<IChangesProps, IChangesState> {
       file.status.kind !== AppFileStatusKind.Deleted &&
       file.status.submoduleStatus === undefined
     )
+  }
+
+  private get canPreviewFile() {
+    const { file } = this.props
+
+    return (
+      isMarkdownFile(file.path) && file.status.submoduleStatus === undefined
+    )
+  }
+
+  private onTogglePreviewFile = () => {
+    const isPreviewingFile = !this.state.isPreviewingFile
+    setBoolean(markdownPreviewKey, isPreviewingFile)
+    this.setState({ isPreviewingFile })
+  }
+
+  private onMarkdownLinkClicked = (url: string) => {
+    this.props.dispatcher.openInBrowser(url)
   }
 
   private get editorHasChanges() {
@@ -324,10 +354,36 @@ export class Changes extends React.Component<IChangesProps, IChangesState> {
           canEditFile={this.canEditFile}
           isEditingFile={this.state.isEditingFile}
           onEditFile={this.onEditFile}
+          canPreviewFile={this.canPreviewFile}
+          isPreviewingFile={this.isPreviewingFile}
+          onTogglePreviewFile={this.onTogglePreviewFile}
         />
 
-        {this.state.isEditingFile ? this.renderEditor() : this.renderDiff()}
+        {this.renderContents()}
       </div>
+    )
+  }
+
+  private get isPreviewingFile() {
+    return this.state.isPreviewingFile && this.canPreviewFile
+  }
+
+  private renderContents() {
+    if (this.state.isEditingFile) {
+      return this.renderEditor()
+    }
+
+    return this.isPreviewingFile ? this.renderPreview() : this.renderDiff()
+  }
+
+  private renderPreview() {
+    return (
+      <MarkdownPreview
+        repository={this.props.repository}
+        file={this.props.file}
+        emoji={this.props.emoji}
+        onMarkdownLinkClicked={this.onMarkdownLinkClicked}
+      />
     )
   }
 

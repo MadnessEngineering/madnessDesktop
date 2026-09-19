@@ -42,6 +42,15 @@ interface IDiffHeaderProps {
 
   /** Called when the user wants to edit the current working tree file. */
   readonly onEditFile?: () => void
+
+  /** Whether the current file can be shown as rendered markdown. */
+  readonly canPreviewFile?: boolean
+
+  /** Whether the rendered markdown is being shown in place of the diff. */
+  readonly isPreviewingFile?: boolean
+
+  /** Called when the user switches between the diff and the rendered file. */
+  readonly onTogglePreviewFile?: () => void
 }
 
 interface IDiffHeaderState {
@@ -146,6 +155,8 @@ export class DiffHeader extends React.Component<
           <PathLabel path={this.props.path} status={this.props.status} />
 
           {this.renderEditButton()}
+
+          {this.renderPreviewButton()}
 
           {this.renderExplainButton()}
 
@@ -272,6 +283,39 @@ export class DiffHeader extends React.Component<
         showSideBySideDiff={this.props.showSideBySideDiff}
         onDiffOptionsOpened={this.props.onDiffOptionsOpened}
       />
+    )
+  }
+
+  private renderPreviewButton() {
+    const { canPreviewFile, isPreviewingFile, onTogglePreviewFile } = this.props
+
+    if (
+      this.props.isEditingFile ||
+      !canPreviewFile ||
+      onTogglePreviewFile === undefined
+    ) {
+      return null
+    }
+
+    const label = isPreviewingFile
+      ? __DARWIN__
+        ? 'Show Diff'
+        : 'Show diff'
+      : __DARWIN__
+      ? 'Preview Markdown'
+      : 'Preview markdown'
+
+    return (
+      <Button
+        ariaLabel={label}
+        ariaPressed={isPreviewingFile}
+        tooltip={label}
+        className="diff-header-icon-button"
+        onClick={onTogglePreviewFile}
+        applyTooltipAriaDescribedBy={false}
+      >
+        <Octicon symbol={isPreviewingFile ? octicons.fileCode : octicons.book} />
+      </Button>
     )
   }
 

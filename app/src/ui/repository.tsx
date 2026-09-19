@@ -706,6 +706,7 @@ export class RepositoryView extends React.Component<
           dispatcher={this.props.dispatcher}
           file={selectedFile}
           diff={diff}
+          emoji={this.props.emoji}
           isCommitting={this.props.state.isCommitting}
           imageDiffType={this.props.imageDiffType}
           hideWhitespaceInDiff={this.props.hideWhitespaceInChangesDiff}

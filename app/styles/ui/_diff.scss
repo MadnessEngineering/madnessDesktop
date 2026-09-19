@@ -896,6 +896,36 @@
   }
 }
 
+/** A markdown file rendered in place of its diff */
+.markdown-preview {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--background-color);
+  padding: var(--spacing);
+}
+
+.markdown-preview-truncated {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-half);
+  margin-bottom: var(--spacing);
+  padding: var(--spacing-half) var(--spacing);
+  border: 1px solid var(--diff-border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-sm);
+}
+
+.markdown-preview-error {
+  .error-details {
+    color: var(--text-secondary-color);
+    font-size: var(--font-size-sm);
+    user-select: text;
+  }
+}
+
 .diff-container {
   display: flex;
   flex-direction: column;

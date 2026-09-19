@@ -36,6 +36,12 @@ import { pathExists } from '../../lib/path-exists'
 import { UnreachableCommitsTab } from './unreachable-commits-dialog'
 import { ExpandableCommitSummary } from './expandable-commit-summary'
 import { DiffHeader } from '../diff/diff-header'
+import {
+  MarkdownPreview,
+  isMarkdownFile,
+  markdownPreviewKey,
+} from '../diff/markdown-preview'
+import { getBoolean, setBoolean } from '../../lib/local-storage'
 import { Account } from '../../models/account'
 import { Emoji } from '../../lib/emoji'
 
@@ -95,6 +101,7 @@ interface ISelectedCommitsProps {
 
 interface ISelectedCommitsState {
   readonly isExpanded: boolean
+  readonly isPreviewingFile: boolean
 }
 
 /** The History component. Contains the commit list, commit summary, and diff. */
@@ -109,7 +116,32 @@ export class SelectedCommits extends React.Component<
 
     this.state = {
       isExpanded: false,
+      isPreviewingFile: getBoolean(markdownPreviewKey, false),
     }
+  }
+
+  private get canPreviewFile() {
+    const { selectedFile } = this.props
+
+    return (
+      selectedFile !== null &&
+      isMarkdownFile(selectedFile.path) &&
+      selectedFile.status.submoduleStatus === undefined
+    )
+  }
+
+  private get isPreviewingFile() {
+    return this.state.isPreviewingFile && this.canPreviewFile
+  }
+
+  private onTogglePreviewFile = () => {
+    const isPreviewingFile = !this.state.isPreviewingFile
+    setBoolean(markdownPreviewKey, isPreviewingFile)
+    this.setState({ isPreviewingFile })
+  }
+
+  private onMarkdownLinkClicked = (url: string) => {
+    this.props.dispatcher.openInBrowser(url)
   }
 
   private onFileSelected = (file: CommittedFileChange) => {
@@ -151,6 +183,20 @@ export class SelectedCommits extends React.Component<
       return (
         <div className="panel blankslate" id="diff">
           {message}
+        </div>
+      )
+    }
+
+    if (this.isPreviewingFile) {
+      return (
+        <div className="diff-container">
+          {this.renderDiffHeader()}
+          <MarkdownPreview
+            repository={this.props.repository}
+            file={file}
+            emoji={this.props.emoji}
+            onMarkdownLinkClicked={this.onMarkdownLinkClicked}
+          />
         </div>
       )
     }
@@ -198,6 +244,9 @@ export class SelectedCommits extends React.Component<
         hideWhitespaceInDiff={this.props.hideWhitespaceInDiff}
         onHideWhitespaceInDiffChanged={this.onHideWhitespaceInDiffChanged}
         onDiffOptionsOpened={this.props.onDiffOptionsOpened}
+        canPreviewFile={this.canPreviewFile}
+        isPreviewingFile={this.isPreviewingFile}
+        onTogglePreviewFile={this.onTogglePreviewFile}
       />
     )
   }
