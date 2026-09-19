@@ -60,6 +60,7 @@ export async function withHooksEnv<T>(
         // has enabled that setting.
         getCacheHooksEnv() ? 'global' : token
       ),
+    tmpHooksDir,
     opts?.onHookProgress,
     opts?.onHookFailure
   )

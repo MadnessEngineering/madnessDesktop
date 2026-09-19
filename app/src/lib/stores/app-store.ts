@@ -258,7 +258,7 @@ import {
   getRepositoryType,
   RepositoryType,
   listWorktrees,
-  listWorktreesFromGitDir,
+  resolveMainWorktreePath,
   removeWorktree,
   moveWorktree,
   getCommitRangeDiff,
@@ -388,6 +388,10 @@ import {
 import { parseRemote } from '../../lib/remote-parsing'
 import { createTutorialRepository } from './helpers/create-tutorial-repository'
 import { sendNonFatalException } from '../helpers/non-fatal-exception'
+import {
+  CopilotConflictResolutionError,
+  CopilotConflictResolutionFailureStage,
+} from '../copilot-conflict-resolution-error'
 import { getDefaultDir } from '../../ui/lib/default-dir'
 import { WorkflowPreferences } from '../../models/workflow-preferences'
 import { RepositoryIndicatorUpdater } from './helpers/repository-indicator-updater'
@@ -487,6 +491,7 @@ import {
 } from '../pull-request-refs'
 import { resolveWithin } from '../path'
 import { WorktreeEntry } from '../../models/worktree'
+import { shouldShowWorktreeDropdown } from '../worktree-dropdown'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
 import { RemoteAllowList, isRemoteAllowed } from '../../models/remote-policy'
 import { containsRemoteGuardBlock } from '../remote-guard-output'
@@ -626,6 +631,8 @@ export const showDiffCheckMarksKey = 'diff-check-marks-visible'
 
 export const groupChangesByFolderDefault = true
 export const groupChangesByFolderKey = 'changes-group-by-folder'
+
+const alwaysShowWorktreeListKey = 'always-show-worktree-list'
 
 const commitMessageGenerationDisclaimerLastSeenKey =
   'commit-message-generation-disclaimer-last-seen'
@@ -816,6 +823,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     | undefined = undefined
 
   private showDiffCheckMarks: boolean = showDiffCheckMarksDefault
+  private alwaysShowWorktreeList: boolean = false
 
   private groupChangesByFolder: boolean = groupChangesByFolderDefault
 
@@ -1564,6 +1572,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       underlineLinks: this.underlineLinks,
       showDiffCheckMarks: this.showDiffCheckMarks,
       groupChangesByFolder: this.groupChangesByFolder,
+      alwaysShowWorktreeList: this.alwaysShowWorktreeList,
       preferAbsoluteDates: this.preferAbsoluteDates,
       updateState: updateStore.state,
       commitMessageGenerationDisclaimerLastSeen:
@@ -2781,6 +2790,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.accounts = accounts
     this.repositories = repositories
+    this.alwaysShowWorktreeList = getBoolean(alwaysShowWorktreeListKey, false)
 
     // Correct any repositories persisted with a git-dir path (a submodule's
     // `.git/modules/<name>`) up front, so the whole list points at real
@@ -3049,27 +3059,24 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /**
    * Determine whether the worktree dropdown is currently shown in the toolbar.
    *
-   * This mirrors the render condition in `App.renderWorktreeToolbarButton`: the
-   * dropdown is shown when worktree support is enabled and either the selected
-   * repository has at least one linked worktree (i.e. more than just the main
-   * worktree) or the worktree foldout is currently open (which lets the user
-   * create their first worktree from the toolbar).
+   * Shares the render condition in `App.renderWorktreeToolbarButton` so that
+   * the toolbar reserves space for the dropdown whenever it is visible.
    */
   private isWorktreeDropdownVisible(): boolean {
     if (!enableWorktreeSupport()) {
       return false
     }
 
-    if (this.currentFoldout?.type === FoldoutType.Worktree) {
-      return true
+    const repository = this.selectedRepository
+    if (!(repository instanceof Repository)) {
+      return false
     }
 
-    const repository = this.selectedRepository
-    const worktreeCount =
-      repository instanceof Repository
-        ? this.repositoryStateCache.get(repository).worktrees.length
-        : 0
-    return worktreeCount > 1
+    return shouldShowWorktreeDropdown(
+      this.repositoryStateCache.get(repository).worktrees.length,
+      this.currentFoldout?.type === FoldoutType.Worktree,
+      this.alwaysShowWorktreeList
+    )
   }
 
   /**
@@ -4481,10 +4488,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
       log.info(
         `[AppStore] healing repository path ${repository.path} -> ${type.topLevelWorkingDirectory}`
       )
+      // Healing moves the repository record to a different working directory,
+      // which invalidates any main worktree recorded against the old one — so
+      // resolve it from the corrected location, as the moved-repository path
+      // in `_updateRepositoryPath` does.
       return this.repositoriesStore.updateRepositoryPath(
         repository,
         type.topLevelWorkingDirectory,
-        type.gitDir
+        type.gitDir,
+        await this.findMainWorktreePath(type.topLevelWorkingDirectory)
       )
     }
 
@@ -4542,26 +4554,34 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return repository
   }
 
+  /**
+   * Ask a worktree that exists on disk which worktree is the main one, or
+   * undefined if git can't tell us.
+   */
+  private findMainWorktreePath(path: string): Promise<string | undefined> {
+    return listWorktrees(path)
+      .then(worktrees => worktrees.find(wt => wt.type === 'main')?.path)
+      .catch(e => {
+        log.error(`Could not list worktrees in '${path}'`, e)
+        return undefined
+      })
+  }
+
   private async recoverMissingWorktree(
     repository: Repository
   ): Promise<Repository | null> {
-    if (repository.gitDir === undefined) {
-      return null
-    }
-
-    const worktrees = await listWorktreesFromGitDir(repository.gitDir).catch(
+    const mainWorktreePath = await resolveMainWorktreePath(repository).catch(
       e => {
-        log.error('Could not list worktrees from git dir', e)
-        return []
+        log.error('Could not resolve the main worktree path', e)
+        return null
       }
     )
-    const mainWorktree = worktrees.find(wt => wt.type === 'main')
 
-    if (mainWorktree === undefined || mainWorktree.path === repository.path) {
+    if (mainWorktreePath === null) {
       return null
     }
 
-    const type = await getRepositoryType(mainWorktree.path).catch(e => {
+    const type = await getRepositoryType(mainWorktreePath).catch(e => {
       log.error('Could not determine main worktree repository type', e)
       return { kind: 'missing' } as RepositoryType
     })
@@ -4574,15 +4594,27 @@ export class AppStore extends TypedBaseStore<IAppState> {
       repository,
       type.topLevelWorkingDirectory,
       false,
-      type.gitDir
+      type.gitDir,
+      type.topLevelWorkingDirectory
     )
 
     if (!result.existingRepository) {
-      this.repositoryStateCache.seedFromWorktree(
-        result.repository,
-        repository,
-        mainWorktree
-      )
+      // The main worktree exists, so its own worktree list is readable even
+      // when the metadata belonging to the removed worktree isn't.
+      const mainWorktree = await listWorktrees(type.topLevelWorkingDirectory)
+        .then(worktrees => worktrees.find(wt => wt.type === 'main'))
+        .catch(e => {
+          log.error('Could not list worktrees from the main worktree', e)
+          return undefined
+        })
+
+      if (mainWorktree !== undefined) {
+        this.repositoryStateCache.seedFromWorktree(
+          result.repository,
+          repository,
+          mainWorktree
+        )
+      }
     }
 
     return result.repository
@@ -4798,10 +4830,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
     // focus event. No point in having the RepositoryIndicatorUpdater do
     // it as well.
     //
+    // Repository-list reloads can create a different object for the selected
+    // database row, so compare IDs rather than references. Cloning selections
+    // aren't local repositories and must not exclude an entry with the same ID.
+    //
     // Note that this method should never leak the actual repositories
     // instance since that's a mutable array. We should always return
     // a copy.
-    return this.repositories.filter(x => x !== this.selectedRepository)
+    const selectedRepositoryID =
+      this.selectedRepository instanceof Repository
+        ? this.selectedRepository.id
+        : null
+    return this.repositories.filter(x => x.id !== selectedRepositoryID)
   }
 
   /**
@@ -5593,6 +5633,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const api = API.fromAccount(account)
 
     const branches = await api.fetchProtectedBranches(owner.login, name)
+    if (branches === null) {
+      return
+    }
 
     await this.repositoriesStore.updateBranchProtections(
       repository.gitHubRepository,
@@ -6845,11 +6888,22 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const missing = type.kind === 'unsafe'
     const gitDir = type.kind === 'regular' ? type.gitDir : undefined
 
+    // Record the main worktree while the worktree set is still readable.
+    // Removing a worktree can take its git metadata with it, leaving nothing to
+    // resolve it from afterwards. Only attempted for a regular repository —
+    // git won't run at all in one it considers unsafe — and `switchWorktree`
+    // keeps the previously recorded path when this is undefined.
+    const mainWorktreePath =
+      type.kind === 'regular'
+        ? await this.findMainWorktreePath(worktree.path)
+        : undefined
+
     const result = await this.repositoriesStore.switchWorktree(
       repository,
       worktree.path,
       missing,
-      gitDir
+      gitDir,
+      mainWorktreePath
     )
 
     this.repositoryStateCache.seedFromWorktree(
@@ -7401,12 +7455,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
       this.accounts,
       repository
     )
-
     if (!account) {
       return null
     }
 
     const totalTimer = startTimer('resolve conflicts with Copilot', repository)
+    let failureStage: CopilotConflictResolutionFailureStage = 'gather-context'
 
     try {
       const state = this.repositoryStateCache.get(repository)
@@ -7415,6 +7469,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
       if (conflictState === null) {
         log.warn(
           'AppStore: resolveConflictsWithCopilot called with no active conflict state'
+        )
+        this.statsStore.increment(
+          'copilotConflictResolutionNoConflictStateCount'
         )
         return null
       }
@@ -7436,6 +7493,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
         log.warn(
           'AppStore: resolveConflictsWithCopilot called with no conflicted files'
         )
+        this.statsStore.increment(
+          'copilotConflictResolutionNoConflictedFilesCount'
+        )
         return null
       }
 
@@ -7454,6 +7514,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
         'copilotStore.resolveConflicts',
         repository
       )
+      failureStage = 'resolve-model'
       const modelRequest = await this.resolveCopilotModelRequest(
         this.getSelectedCopilotModels(account)['conflict-resolution'] ?? null
       )
@@ -7466,6 +7527,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
           onProgress,
           signal
         )
+        failureStage = 'process-result'
 
         // The model can only cite data we placed in the prompt, so resolving
         // its references is a simple lookup against the gathered context —
@@ -7484,6 +7546,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
             ? [{ path: f.path, reason: f.skippedReason }]
             : []
         )
+
+        if (
+          result.resolutions.length === 0 &&
+          skippedFiles.length === context.files.length
+        ) {
+          this.statsStore.increment(
+            'copilotConflictResolutionAllFilesSkippedCount'
+          )
+        }
 
         return {
           resolutions: result.resolutions,
@@ -7507,7 +7578,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
       // Propagate real failures so the caller can surface the underlying error
       // instead of a generic "no results" message.
       log.warn('AppStore: Copilot conflict resolution failed', e)
-      throw e
+      throw e instanceof CopilotConflictResolutionError
+        ? e
+        : new CopilotConflictResolutionError(e, failureStage)
     } finally {
       totalTimer.done()
     }
@@ -7924,7 +7997,20 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
 
       if (result === null) {
-        throw new Error('Copilot conflict resolution returned no results')
+        this.repositoryStateCache.updateMultiCommitOperationState(
+          repository,
+          () => ({
+            step: {
+              kind: MultiCommitOperationStepKind.ShowConflicts,
+              conflictState,
+            },
+            useCopilotConflictResolution: false,
+            copilotResolutionProgress: null,
+            copilotResolutionAbortController: null,
+          })
+        )
+        this.emitUpdate()
+        return
       }
 
       if (isConfirmAbortFromLoading) {
@@ -7995,10 +8081,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
       this.statsStore.increment('copilotConflictResolutionErrorCount')
 
+      const failure =
+        e instanceof CopilotConflictResolutionError
+          ? e
+          : new CopilotConflictResolutionError(e, 'unknown')
+      sendNonFatalException('copilotConflictResolution', failure)
+
       // Surface the error to the user so they understand why they were
       // routed back to manual conflict resolution. Mirrors the pattern
       // used by `_generateCommitMessage`.
-      this.emitError(new ErrorWithMetadata(e, { repository }))
+      this.emitError(
+        new ErrorWithMetadata(failure.underlyingError, { repository })
+      )
 
       // Transition back to manual conflict resolution
       this.repositoryStateCache.updateMultiCommitOperationState(
@@ -8923,6 +9017,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return this.statsStore.reportStats(this.accounts, this.repositories)
   }
 
+  /** This shouldn't be called directly. See 'Dispatcher'. */
+  public _sendStats() {
+    return this.statsStore.sendStats(this.accounts, this.repositories)
+  }
+
   public _recordLaunchStats(stats: ILaunchStats): Promise<void> {
     return this.statsStore.recordLaunchStats(stats)
   }
@@ -8962,8 +9061,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return this.signInStore.beginEnterpriseSignIn(resultCallback)
   }
 
-  public _setSignInEndpoint(url: string): Promise<void> {
-    return this.signInStore.setEndpoint(url)
+  /** This shouldn't be called directly. See 'Dispatcher'. */
+  public _setSignInEndpoint(
+    url: string,
+    isEndpointFromGit = false
+  ): Promise<void> {
+    return this.signInStore.setEndpoint(url, isEndpointFromGit)
   }
 
   public _requestBrowserAuthentication() {
@@ -9190,15 +9293,22 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const rt = await getRepositoryType(path)
 
     if (rt.kind === 'regular') {
+      // The repository has moved, so any main worktree we recorded before now
+      // points at where it used to be. Resolve it again from the new location.
       await this.repositoriesStore.updateRepositoryPath(
         repository,
         rt.topLevelWorkingDirectory,
-        rt.gitDir
+        rt.gitDir,
+        await this.findMainWorktreePath(rt.topLevelWorkingDirectory)
       )
     } else if (rt.kind === 'unsafe') {
+      // Git refuses to run in a repository it considers unsafe, so there's no
+      // resolving the main worktree here. Drop the recorded path rather than
+      // keep one we know is stale.
       await this.repositoriesStore.updateRepositoryPath(
         repository,
         path,
+        undefined,
         undefined,
         true
       )
@@ -11237,6 +11347,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
       this.groupChangesByFolder = groupChangesByFolder
       setBoolean(groupChangesByFolderKey, groupChangesByFolder)
       this.updateMenuLabelsForSelectedRepository()
+      this.emitUpdate()
+    }
+  }
+
+  /** This shouldn't be called directly. See 'Dispatcher'. */
+  public _setAlwaysShowWorktreeList(alwaysShowWorktreeList: boolean) {
+    if (alwaysShowWorktreeList !== this.alwaysShowWorktreeList) {
+      this.alwaysShowWorktreeList = alwaysShowWorktreeList
+      setBoolean(alwaysShowWorktreeListKey, alwaysShowWorktreeList)
+      this.updateResizableConstraints()
       this.emitUpdate()
     }
   }

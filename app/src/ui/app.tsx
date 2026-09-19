@@ -260,6 +260,7 @@ import { RenameWorktreeDialog } from './worktrees/rename-worktree-dialog'
 import { DeleteWorktreeDialog } from './worktrees/delete-worktree-dialog'
 import { DeleteWorktreeFailedDialog } from './worktrees/delete-worktree-failed-dialog'
 import { WorktreeEntry } from '../models/worktree'
+import { shouldShowWorktreeDropdown } from '../lib/worktree-dropdown'
 
 const MinuteInMilliseconds = 1000 * 60
 const HourInMilliseconds = MinuteInMilliseconds * 60
@@ -803,7 +804,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     if (isMacOSAndNoLongerSupportedByElectron()) {
       log.error(
-        `Can't check for updates on macOS 10.15 or older. Next available update only supports macOS 11.0 and later`
+        `Can't check for updates on macOS 12 or older. Next available update only supports macOS 13 and later`
       )
       return
     }
@@ -2097,6 +2098,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             underlineLinks={this.state.underlineLinks}
             showDiffCheckMarks={this.state.showDiffCheckMarks}
             groupChangesByFolder={this.state.groupChangesByFolder}
+            alwaysShowWorktreeList={this.state.alwaysShowWorktreeList}
             selectedCopilotModelsByAccount={
               this.state.selectedCopilotModelsByAccount
             }
@@ -4462,10 +4464,13 @@ export class App extends React.Component<IAppProps, IAppState> {
     const isOpen =
       currentFoldout !== null && currentFoldout.type === FoldoutType.Worktree
 
-    // Only show the worktree dropdown when there are linked worktrees or if the
-    // foldout is open. This allows the user to create a worktree from the app
-    // menu even when there are no worktrees.
-    if (worktrees.length <= 1 && !isOpen) {
+    if (
+      !shouldShowWorktreeDropdown(
+        worktrees.length,
+        isOpen,
+        this.state.alwaysShowWorktreeList
+      )
+    ) {
       return null
     }
 

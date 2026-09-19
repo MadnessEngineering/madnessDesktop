@@ -153,7 +153,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repo.alias,
       repo.workflowPreferences,
       repo.isTutorialRepository,
-      repo.gitDir
+      repo.gitDir,
+      repo.mainWorktreePath
     )
   }
 
@@ -293,7 +294,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.alias,
       repository.workflowPreferences,
       repository.isTutorialRepository,
-      repository.gitDir
+      repository.gitDir,
+      repository.mainWorktreePath
     )
   }
 
@@ -321,7 +323,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.alias,
       repository.workflowPreferences,
       repository.isTutorialRepository,
-      gitDir
+      gitDir,
+      repository.mainWorktreePath
     )
   }
 
@@ -355,19 +358,29 @@ export class RepositoriesStore extends TypedBaseStore<
     this.emitUpdatedRepositories()
   }
 
-  /** Update the repository's path. */
+  /**
+   * Update the repository's path.
+   *
+   * Unlike `switchWorktree` this doesn't default `mainWorktreePath` to the
+   * recorded one. Moving a repository invalidates it, so callers say what it is
+   * now, or `undefined` when it can't be resolved.
+   */
   public async updateRepositoryPath(
     repository: Repository,
     path: string,
     gitDir: string | undefined,
+    mainWorktreePath: string | undefined,
     missing: boolean = false
   ): Promise<Repository> {
     // Skip the write (and the store update it triggers) when nothing changed,
     // so a repeated heal of an already-corrected path can't loop the app
-    // through reselect → refresh → heal indefinitely.
+    // through reselect → refresh → heal indefinitely. Every field the
+    // update below writes has to be compared here, or a change to just that
+    // field would be silently dropped.
     if (
       repository.path === path &&
       repository.gitDir === gitDir &&
+      repository.mainWorktreePath === mainWorktreePath &&
       repository.missing === missing
     ) {
       return repository
@@ -390,6 +403,7 @@ export class RepositoriesStore extends TypedBaseStore<
         missing,
         path,
         gitDir,
+        mainWorktreePath,
       })
     })
 
@@ -403,7 +417,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.alias,
       repository.workflowPreferences,
       repository.isTutorialRepository,
-      gitDir
+      gitDir,
+      mainWorktreePath
     )
   }
 
@@ -417,12 +432,16 @@ export class RepositoriesStore extends TypedBaseStore<
    * @param repository  The repository to switch
    * @param worktreePath The path of the worktree to switch to
    * @param gitDir       The git directory for the target worktree
+   * @param mainWorktreePath The path of the repository's main worktree, which
+   *                         recovery relies on once the target worktree (and
+   *                         its git metadata) is gone
    */
   public async switchWorktree(
     repository: Repository,
     worktreePath: string,
     missing = false,
-    gitDir: string | undefined = repository.gitDir
+    gitDir: string | undefined = repository.gitDir,
+    mainWorktreePath: string | undefined = repository.mainWorktreePath
   ): Promise<{ repository: Repository; existingRepository: boolean }> {
     const existing = await this.db.repositories.get({ path: worktreePath })
 
@@ -437,6 +456,7 @@ export class RepositoriesStore extends TypedBaseStore<
       path: worktreePath,
       missing,
       gitDir,
+      mainWorktreePath,
     })
 
     this.emitUpdatedRepositories()
@@ -450,7 +470,8 @@ export class RepositoriesStore extends TypedBaseStore<
         repository.alias,
         repository.workflowPreferences,
         repository.isTutorialRepository,
-        gitDir
+        gitDir,
+        mainWorktreePath
       ),
       existingRepository: false,
     }
@@ -599,7 +620,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repo.alias,
       repo.workflowPreferences,
       repo.isTutorialRepository,
-      repo.gitDir
+      repo.gitDir,
+      repo.mainWorktreePath
     )
 
     assertIsRepositoryWithGitHubRepository(updatedRepo)

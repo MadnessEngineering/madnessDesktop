@@ -53,6 +53,15 @@ interface IAppearanceProps {
   ) => void
   readonly selectedTabSize: number
   readonly onSelectedTabSizeChanged: (tabSize: number) => void
+  /**
+   * Whether worktrees are turned on at all. Upstream ships the worktree list
+   * behind their own kill switch; this fork gates it on the user preference in
+   * Advanced, so the "always show" toggle has nothing to act on when that is
+   * off and is hidden rather than shown as dead UI.
+   */
+  readonly worktreesEnabled: boolean
+  readonly alwaysShowWorktreeList: boolean
+  readonly onAlwaysShowWorktreeListChanged: (value: boolean) => void
   readonly selectedDateFormat: DateFormat
   readonly onSelectedDateFormatChanged: (format: DateFormat) => void
   readonly selectedTimeFormat: TimeFormat
@@ -175,6 +184,12 @@ export class Appearance extends React.Component<
     event: React.FormEvent<HTMLInputElement>
   ) => {
     this.props.onPreferAbsoluteDatesChanged(event.currentTarget.checked)
+  }
+
+  private onAlwaysShowWorktreeListChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onAlwaysShowWorktreeListChanged(event.currentTarget.checked)
   }
 
   public renderThemeSwatch = (theme: ApplicationTheme) => {
@@ -342,16 +357,16 @@ export class Appearance extends React.Component<
     )
   }
 
-  private renderSelectedTabSize() {
+  private renderMiscellaneous() {
     const availableTabSizes: number[] = [1, 2, 3, 4, 5, 6, 8, 10, 12]
 
     return (
       <div className="appearance-section">
-        <h2 id="diff-heading">Diff</h2>
+        <h2 id="miscellaneous-heading">Miscellaneous</h2>
 
         <Select
           value={this.state.selectedTabSize.toString()}
-          label={__DARWIN__ ? 'Tab Size' : 'Tab size'}
+          label={__DARWIN__ ? 'Diff Tab Size' : 'Diff tab size'}
           onChange={this.onSelectedTabSizeChanged}
         >
           {availableTabSizes.map(n => (
@@ -360,6 +375,19 @@ export class Appearance extends React.Component<
             </option>
           ))}
         </Select>
+
+        {this.props.worktreesEnabled && (
+          <Checkbox
+            className="always-show-worktree-list"
+            label="Always show worktree list"
+            value={
+              this.props.alwaysShowWorktreeList
+                ? CheckboxValue.On
+                : CheckboxValue.Off
+            }
+            onChange={this.onAlwaysShowWorktreeListChanged}
+          />
+        )}
       </div>
     )
   }
@@ -617,7 +645,7 @@ export class Appearance extends React.Component<
         {this.renderMadnessThemes()}
         {this.renderPersonalitySelector()}
         {this.renderFormatting()}
-        {this.renderSelectedTabSize()}
+        {this.renderMiscellaneous()}
         {this.renderChangesList()}
         {this.renderNotifications()}
         {this.renderAccessibility()}

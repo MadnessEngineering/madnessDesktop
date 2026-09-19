@@ -38,7 +38,7 @@ import { ChangedFile } from './changed-file'
 import { IAutocompletionProvider } from '../autocompletion'
 import { showContextualMenu } from '../../lib/menu-item'
 import { arrayEquals } from '../../lib/equality'
-import { clipboard } from 'electron'
+import { writeClipboardText } from '../main-process-proxy'
 import { basename } from 'path'
 import { Commit, ICommitContext } from '../../models/commit'
 import {
@@ -628,11 +628,11 @@ export class FilterChangesList extends React.Component<
       {
         label: CopyFolderPathLabel,
         action: () =>
-          clipboard.writeText(Path.join(this.props.repository.path, path)),
+          writeClipboardText(Path.join(this.props.repository.path, path)),
       },
       {
         label: CopyRelativeFolderPathLabel,
-        action: () => clipboard.writeText(Path.normalize(path)),
+        action: () => writeClipboardText(Path.normalize(path)),
       },
       { type: 'separator' },
       {
@@ -885,7 +885,7 @@ export class FilterChangesList extends React.Component<
       label: CopyFilePathLabel,
       action: () => {
         const fullPath = Path.join(this.props.repository.path, file.path)
-        clipboard.writeText(fullPath)
+        writeClipboardText(fullPath)
       },
     }
   }
@@ -895,7 +895,7 @@ export class FilterChangesList extends React.Component<
   ): IMenuItem => {
     return {
       label: CopyRelativeFilePathLabel,
-      action: () => clipboard.writeText(Path.normalize(file.path)),
+      action: () => writeClipboardText(Path.normalize(file.path)),
     }
   }
 
@@ -908,7 +908,7 @@ export class FilterChangesList extends React.Component<
         const fullPaths = files.map(file =>
           Path.join(this.props.repository.path, file.path)
         )
-        clipboard.writeText(fullPaths.join(EOL))
+        writeClipboardText(fullPaths.join(EOL))
       },
     }
   }
@@ -920,7 +920,7 @@ export class FilterChangesList extends React.Component<
       label: CopySelectedRelativePathsLabel,
       action: () => {
         const paths = files.map(file => Path.normalize(file.path))
-        clipboard.writeText(paths.join(EOL))
+        writeClipboardText(paths.join(EOL))
       },
     }
   }

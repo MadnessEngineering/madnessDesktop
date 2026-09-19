@@ -99,6 +99,22 @@ it looks:
 **Both** — most conflicts are additive on each side (a prop, a dispatcher
 method, an import block). Concatenate and move on.
 
+**Watch for upstream *moving* code you also changed.** A relocation conflicts at
+the origin and merges cleanly at the destination, so the conflict markers show
+you half of it and the other half is already in the file. Concatenating both
+sides then duplicates the moved code. In the 2026-09 sync upstream moved
+`push`'s remote name, refspec and tags to the end of the function behind a `--`
+terminator (their leading-dash hardening); our side of the conflict still
+carried the tags block from the top, and taking both would have pushed every tag
+twice. Before resolving a conflict, read the whole function in the merged file,
+not just the marked region.
+
+**Re-gate upstream's new options.** Where we gate a feature more strictly than
+upstream, each sync can bring fresh UI for it that arrives ungated. 2026-09
+brought an "Always show worktree list" checkbox straight into Appearance, which
+is dead UI when our `worktreesEnabled` preference is off; it now renders behind
+that preference. Grep new preference UI for the features we gate.
+
 **Lockfiles** — never hand-merge. Take one side, then regenerate:
 
 ```sh
@@ -125,6 +141,28 @@ In the 2026-07 sync this caught exactly one casualty —
 `const isNonProductionRelease = ...` in `script/build.ts` — which broke the
 build and which `tsc -p tsconfig.json` does not cover, because the build scripts
 compile under `script/tsconfig.json`.
+
+The grep depends on the dropped line mentioning one of our keywords, and plenty
+of our lines don't. The exhaustive form takes every line we added since the
+merge base and checks it is still somewhere in the merged tree, across just the
+files both sides touched — a few dozen, so it is quick:
+
+```sh
+git diff --name-only $MB..$PRE_MERGE > /tmp/ours
+git diff --name-only $MB..upstream/development > /tmp/theirs
+for f in $(comm -12 <(sort /tmp/ours) <(sort /tmp/theirs) | grep -E '\.(ts|tsx|scss|mts)$'); do
+  git diff -U0 $MB..$PRE_MERGE -- "$f" | grep '^+' | grep -v '^+++' |
+    cut -c2- | grep -v '^[[:space:]]*$' |
+    while IFS= read -r line; do
+      grep -qF "$(printf '%s' "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')" "$f" ||
+        echo "$f: $line"
+    done
+done
+```
+
+Read the hits rather than trusting the count: lines you rewrote on purpose
+during resolution show up here too, and in the 2026-09 sync those three were the
+only output.
 
 ## Verification ladder
 
@@ -174,6 +212,12 @@ are enabled on this fork. Workflows triggered by `issues` events only fire from
 the default branch, so a merge branch is inert — but decide about them before
 merging to the default branch, not after.
 
+Not every one of these fires on its own. `draft-release.yml` is
+`workflow_dispatch` only, but as of the 2026-09 sync it asks for
+`copilot-requests: write` and passes the repository's own `github.token` as
+`COPILOT_GITHUB_TOKEN`, where it previously needed a secret upstream held. It is
+inert until somebody triggers it, and worth knowing before somebody does.
+
 We deleted upstream's gh-aw agentic issue triage in the 2026-07 sync
 (`.github/workflows/issue-triage.{md,lock.yml}` and
 `.github/aw/actions-lock.json`): it dispatches Copilot at issues opened here,
@@ -188,3 +232,4 @@ resolving, and check what any new workflow triggers on.
 | --- | --- | --- | --- |
 | 2026-05-31 | — | not recorded | |
 | 2026-07-27 | 3.6.4-beta1 era | 16 files, ~31 hunks | dompurify 3.4.0 → 3.4.11, copilot-sdk beta.1 → 1.0.5; Electron already matched at 42.0.1. Suite went 755 pass / 76 fail → 1556 pass / 0 fail after fixing the test harness the merge unblocked. |
+| 2026-09-19 | 3.6.7-beta2 | 14 files | Electron 42.0.1 → 44.1.1, Node 24.15.0 → 24.19.0, copilot-sdk 1.0.5 → 1.0.13, dompurify 3.4.11 → 3.4.13. 231 upstream commits over two months; 44 of our 382 changed files overlapped their 150. Three breakages appeared that no conflict marker mentioned, all of them upstream reaching for something this fork routes elsewhere: our folder context-menu items still calling the `clipboard` import upstream deleted (tsc), and two test files patching `electron`'s `ipcRenderer` where this fork goes through `lib/ipc-renderer` → `window.electronBridge` (only the suite). |

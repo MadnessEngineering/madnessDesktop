@@ -125,6 +125,7 @@ interface IPreferencesProps {
   readonly selectedMadnessTheme: MadnessTheme
   readonly selectedPersonality: MadnessPersonality
   readonly selectedTabSize: number
+  readonly alwaysShowWorktreeList: boolean
   readonly useCustomEditor: boolean
   readonly customEditor: ICustomIntegration | null
   readonly useCustomShell: boolean
@@ -210,6 +211,7 @@ interface IPreferencesState {
 
   readonly initiallySelectedTheme: ApplicationTheme
   readonly initiallySelectedTabSize: number
+  readonly alwaysShowWorktreeList: boolean
 
   readonly isLoadingGitConfig: boolean
 
@@ -317,6 +319,7 @@ export class Preferences extends React.Component<
         this.props.chatHistoryArchiveConfig ?? DefaultChatHistoryArchiveConfig,
       initiallySelectedTheme: this.props.selectedTheme,
       initiallySelectedTabSize: this.props.selectedTabSize,
+      alwaysShowWorktreeList: this.props.alwaysShowWorktreeList,
       isLoadingGitConfig: true,
       underlineLinks: this.props.underlineLinks,
       showDiffCheckMarks: this.props.showDiffCheckMarks,
@@ -738,6 +741,11 @@ export class Preferences extends React.Component<
             onSelectedPersonalityChanged={this.onSelectedPersonalityChanged}
             selectedTabSize={this.props.selectedTabSize}
             onSelectedTabSizeChanged={this.onSelectedTabSizeChanged}
+            worktreesEnabled={this.state.worktreesEnabled}
+            alwaysShowWorktreeList={this.state.alwaysShowWorktreeList}
+            onAlwaysShowWorktreeListChanged={
+              this.onAlwaysShowWorktreeListChanged
+            }
             selectedDateFormat={
               this.state.selectedDateFormat ?? getDateFormatPreference()
             }
@@ -1171,6 +1179,12 @@ export class Preferences extends React.Component<
     this.props.dispatcher.setSelectedTabSize(tabSize)
   }
 
+  private onAlwaysShowWorktreeListChanged = (
+    alwaysShowWorktreeList: boolean
+  ) => {
+    this.setState({ alwaysShowWorktreeList })
+  }
+
   private renderFooter() {
     const hasDisabledError = this.state.disallowedCharactersMessage != null
 
@@ -1389,6 +1403,7 @@ export class Preferences extends React.Component<
     dispatcher.setUnderlineLinksSetting(this.state.underlineLinks)
 
     dispatcher.setDiffCheckMarksSetting(this.state.showDiffCheckMarks)
+    dispatcher.setAlwaysShowWorktreeList(this.state.alwaysShowWorktreeList)
 
     dispatcher.setGroupChangesByFolderSetting(this.state.groupChangesByFolder)
 

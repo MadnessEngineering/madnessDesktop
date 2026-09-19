@@ -66,15 +66,7 @@ export async function push(
   options?: PushOptions,
   progressCallback?: (progress: IPushProgress) => void
 ): Promise<void> {
-  const args = [
-    'push',
-    remote.name,
-    remoteBranch ? `${localBranch}:${remoteBranch}` : localBranch,
-  ]
-
-  if (tagsToPush !== null) {
-    args.push(...tagsToPush)
-  }
+  const args = ['push']
 
   // Default preserves the historical behaviour: set upstream exactly when the
   // branch isn't tracking anything yet. That's right for a first publish, but
@@ -84,6 +76,9 @@ export async function push(
   //
   // Git is happy to take --set-upstream and --force-with-lease together; the
   // exclusivity below is this file's own long-standing choice, kept as-is.
+  //
+  // The refspec and tags are appended after a `--` at the end of the function
+  // (upstream's leading-dash hardening), so only flags are assembled here.
   const setUpstream = options?.setUpstream ?? remoteBranch === null
 
   if (setUpstream) {
@@ -136,6 +131,16 @@ export async function push(
       remote: remote.name,
       branch: localBranch,
     })
+  }
+
+  args.push(
+    '--',
+    remote.name,
+    remoteBranch ? `${localBranch}:${remoteBranch}` : localBranch
+  )
+
+  if (tagsToPush !== null) {
+    args.push(...tagsToPush)
   }
 
   await git(args, repository.path, 'push', opts)

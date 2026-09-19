@@ -141,3 +141,8 @@ export function enableLocalAISecuritySettings(): boolean {
  * preference does the gating — see menu-update.
  */
 export const enableWorktreeSupport = () => true
+
+/** Should stats be sent to the new telemetry endpoint? */
+export function enableNewStatsEndpoint(): boolean {
+  return enableBetaFeatures()
+}
