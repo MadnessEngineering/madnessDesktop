@@ -6,6 +6,10 @@ upstream's: opted-in installs post to GitHub's analytics service, which is not
 one this fork operates or can read. "We" below means the upstream team whose
 decisions those metrics inform.
 
+**Reporting is off unless you turn it on.** Upstream defaults to reporting;
+this fork does not, and an install that has never been asked sends nothing at
+all, not even the opt-status ping upstream uses to count opt-outs.
+
 ## Why do we need usage stats?
 
 **Our team uses metrics to prioritize our work and evaluate whether we are successfully solving real users' problems.** For example, when we released dark theme and a guided way to resolve merge conflicts, we wanted to understand whether people were using those features and whether they provided value.
@@ -24,4 +28,4 @@ Copilot-based features track their own metrics separately. Madness Desktop relie
 
 ## Enable or disable usage reporting
 
-You can change your usage-reporting preference at any time. Open Madness Desktop's settings, select **Advanced**, and enable or disable the option to share usage data.
+Usage reporting is disabled by default. You can change the preference at any time: open Madness Desktop's settings, select **Advanced**, and enable or disable the option to share usage data.

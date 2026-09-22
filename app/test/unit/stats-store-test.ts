@@ -18,6 +18,7 @@ describe('StatsStore', () => {
     statsDb.close()
     localStorage.removeItem('has-sent-stats-opt-in-ping')
     localStorage.removeItem('last-daily-stats-report')
+    localStorage.removeItem('stats-opt-out')
   })
 
   it("unsubscribes from the activity monitor when it's no longer needed", async () => {
@@ -66,6 +67,9 @@ describe('StatsStore', () => {
     const activityMonitor = new TestActivityMonitor()
     const postedBodies: Array<Record<string, any>> = []
     localStorage.setItem('has-sent-stats-opt-in-ping', '1')
+    // This fork defaults to opted out, so a test about what gets sent has to
+    // opt in first or there is nothing to assert on.
+    localStorage.setItem('stats-opt-out', '0')
 
     const store = new StatsStore(statsDb, activityMonitor, async body => {
       postedBodies.push(body)
@@ -89,6 +93,9 @@ describe('StatsStore', () => {
     let requestBody: string | undefined
     const previousPreviewFeatures = process.env.GITHUB_DESKTOP_PREVIEW_FEATURES
     localStorage.setItem('has-sent-stats-opt-in-ping', '1')
+    // This fork defaults to opted out, so a test about what gets sent has to
+    // opt in first or there is nothing to assert on.
+    localStorage.setItem('stats-opt-out', '0')
     delete process.env.GITHUB_DESKTOP_PREVIEW_FEATURES
     t.after(() => {
       if (previousPreviewFeatures !== undefined) {
@@ -137,6 +144,9 @@ describe('StatsStore', () => {
     let requestBody: string | undefined
     const previousPreviewFeatures = process.env.GITHUB_DESKTOP_PREVIEW_FEATURES
     localStorage.setItem('has-sent-stats-opt-in-ping', '1')
+    // This fork defaults to opted out, so a test about what gets sent has to
+    // opt in first or there is nothing to assert on.
+    localStorage.setItem('stats-opt-out', '0')
     process.env.GITHUB_DESKTOP_PREVIEW_FEATURES = '1'
     t.after(() => {
       if (previousPreviewFeatures === undefined) {
@@ -199,7 +209,11 @@ describe('StatsStore', () => {
     const previousPreviewFeatures = process.env.GITHUB_DESKTOP_PREVIEW_FEATURES
     process.env.GITHUB_DESKTOP_PREVIEW_FEATURES = '1'
     localStorage.removeItem('has-sent-stats-opt-in-ping')
-    localStorage.removeItem('stats-opt-out')
+    // Upstream leaves this unset, because for them an install with no stored
+    // choice is opted in and still pings. This fork stays silent until the user
+    // chooses, so the ping path only exists once a choice has been stored —
+    // record one here, otherwise there is no ping to assert on.
+    localStorage.setItem('stats-opt-out', '0')
     t.after(() => {
       localStorage.removeItem('stats-opt-out')
       if (previousPreviewFeatures === undefined) {
@@ -228,8 +242,54 @@ describe('StatsStore', () => {
       event_type: 'ping',
       dimensions: {
         optIn: 'true',
-        previousOptInValue: 'null',
+        previousOptInValue: 'true',
       },
     })
+  })
+
+  it('defaults to opted out when the user has never chosen', async () => {
+    statsDb = await createStatsDb()
+    localStorage.removeItem('stats-opt-out')
+
+    const store = new StatsStore(
+      statsDb,
+      new TestActivityMonitor(),
+      fakePost
+    )
+
+    assert.strictEqual(store.getOptOut(), true)
+  })
+
+  it('keeps an explicit opt in when one was stored', async () => {
+    statsDb = await createStatsDb()
+    localStorage.setItem('stats-opt-out', '0')
+
+    const store = new StatsStore(
+      statsDb,
+      new TestActivityMonitor(),
+      fakePost
+    )
+
+    assert.strictEqual(store.getOptOut(), false)
+  })
+
+  it('sends no opt-in ping for an install that was never asked', async t => {
+    statsDb = await createStatsDb()
+    localStorage.removeItem('has-sent-stats-opt-in-ping')
+    localStorage.removeItem('stats-opt-out')
+
+    let posted = false
+    t.mock.method(globalThis, 'fetch', async () => {
+      posted = true
+      return new Response(null, { status: 200 })
+    })
+
+    new StatsStore(statsDb, new TestActivityMonitor())
+
+    // The ping is fire-and-forget in the constructor, so let anything it queued
+    // run before concluding that nothing was sent.
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    assert.strictEqual(posted, false)
   })
 })

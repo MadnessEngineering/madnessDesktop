@@ -74,6 +74,9 @@ const LastDailyStatsReportKey = 'last-daily-stats-report'
 /** The localStorage key for whether the user has opted out. */
 const StatsOptOutKey = 'stats-opt-out'
 
+/** What an install that has never been asked does. See getHasOptedOutOfStats. */
+const StatsOptOutDefault = true
+
 /** Have we successfully sent the stats opt-in? */
 const HasSentOptInPingKey = 'has-sent-stats-opt-in-ping'
 
@@ -654,13 +657,18 @@ export class StatsStore implements IStatsStore {
     private readonly uiActivityMonitor: IUiActivityMonitor,
     private readonly post = defaultPostImplementation
   ) {
-    const storedValue = getHasOptedOutOfStats()
+    const storedValue = getStoredStatsOptOut()
 
-    this.optOut = storedValue || false
+    this.optOut = storedValue ?? StatsOptOutDefault
 
     // If the user has set an opt out value but we haven't sent the ping yet,
     // give it a shot now.
-    if (!getBoolean(HasSentOptInPingKey, false)) {
+    //
+    // `storedValue` being undefined means they never set one. Upstream pings
+    // anyway, to measure how many installs opt out; doing that here would have
+    // an install that defaults to silence announce itself to GitHub's analytics
+    // on first launch, which is the whole thing this default exists to avoid.
+    if (storedValue !== undefined && !getBoolean(HasSentOptInPingKey, false)) {
       this.sendOptInStatusPing(this.optOut, storedValue)
     }
 
@@ -1480,6 +1488,27 @@ function timeTo(key: string): number | undefined {
  * Return a value indicating whether the user has opted out of stats reporting
  * or not.
  */
+/**
+ * Whether stats reporting is off, which is what this fork does until the user
+ * says otherwise.
+ *
+ * Upstream defaults to reporting, and that made sense for them: the analytics
+ * are theirs and the opt rate informs their product. Neither is true here. The
+ * endpoint is still GitHub's, nobody on this side can read what is sent, and
+ * upstream did not ask a fork to send it, so an install that was never asked
+ * stays quiet.
+ *
+ * Use this for "should we report", and `getStoredStatsOptOut` for "did the user
+ * actually make a choice" — the two differ precisely on a fresh install.
+ */
 export function getHasOptedOutOfStats() {
+  return getStoredStatsOptOut() ?? StatsOptOutDefault
+}
+
+/**
+ * The opt-out value the user explicitly chose, or undefined if they never
+ * touched the setting.
+ */
+export function getStoredStatsOptOut() {
   return getBoolean(StatsOptOutKey)
 }
