@@ -100,6 +100,76 @@ function isExternalReference(reference: string) {
   return /^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(reference)
 }
 
+/**
+ * Typography for the preview, injected into the sandboxed iframe on top of the
+ * markdown stylesheet the app shares with pull request bodies.
+ *
+ * That stylesheet is written for a comment box -- narrow, short, and never a
+ * whole document. A file rendered across a maximized window is a different
+ * problem: the measure has to be capped or the eye loses the line it is on,
+ * and the parts of GitHub's markdown that only show up in files (task lists,
+ * footnotes) have no rules there at all.
+ */
+const PreviewStyles = `
+  /* ~90 characters at the base font size. Left-aligned rather than centred:
+     the preview sits beside the file list, and centring floats it away from
+     the file it belongs to. */
+  #content {
+    max-width: 90ch;
+    padding: 0 var(--spacing, 10px);
+  }
+
+  /* The file's own title shouldn't start a line down from the top of a pane
+     that is already titled. */
+  .markdown-body > :first-child {
+    margin-top: 0;
+  }
+
+  /* A task list is a list of states, not of bullets -- GitHub drops the
+     marker and hangs the checkbox in the margin. markdown.css has no rules
+     for any of this, so a checked box renders with a bullet beside it.
+     Selected with :has rather than .task-list-item because marked emits the
+     checkbox with no class of its own (GitHub's own markup has one, its
+     parser is not this one). */
+  .markdown-body li:has(> input[type='checkbox']) {
+    list-style-type: none;
+  }
+
+  .markdown-body li:has(> input[type='checkbox']) + li {
+    margin-top: 4px;
+  }
+
+  .markdown-body li > input[type='checkbox'] {
+    margin: 0 0.35em 0.25em -1.4em;
+    vertical-align: middle;
+  }
+
+  /* Long lines in a code block scroll on their own rather than stretching the
+     document out under them. */
+  .markdown-body pre {
+    overflow-x: auto;
+  }
+
+  /* Wide tables do the same, and keep their own border while doing it. */
+  .markdown-body table {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  /* An image is usually a screenshot: let it sit on its own line rather than
+     wrapping text around whatever height it happens to be. */
+  .markdown-body img {
+    display: block;
+  }
+
+  .markdown-body .footnotes {
+    font-size: var(--font-size-sm);
+    color: var(--md-fg-muted-color);
+  }
+`
+
 interface IMarkdownPreviewProps {
   readonly repository: Repository
 
@@ -348,6 +418,8 @@ export class MarkdownPreview extends React.Component<
           emoji={this.props.emoji}
           onMarkdownLinkClicked={this.props.onMarkdownLinkClicked}
           underlineLinks={true}
+          linebreaks={false}
+          customCSS={PreviewStyles}
           ariaLabel={`Preview of ${this.props.file.path}`}
         />
       </div>

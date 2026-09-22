@@ -55,6 +55,15 @@ interface ISandboxedMarkdownProps {
    * or other typographic styles without breaking iframe isolation.
    */
   readonly customCSS?: string
+
+  /**
+   * Whether a single line break in the source becomes a <br>. Defaults to
+   * true, which is what GitHub does in comments -- people press enter there
+   * and expect a new line. A rendered markdown FILE is not a comment: a
+   * hard-wrapped paragraph is still one paragraph, and rendering it with a
+   * break per source line leaves it ragged. Previewing a file passes false.
+   */
+  readonly linebreaks?: boolean
 }
 
 interface ISandboxedMarkdownState {
@@ -135,7 +144,7 @@ export class SandboxedMarkdown extends React.PureComponent<
         // https://marked.js.org/using_advanced, If true, add <br> on a single
         // line break (copies GitHub behavior on comments, but not on rendered
         // markdown files). Requires gfm be true.
-        breaks: true,
+        breaks: this.props.linebreaks ?? true,
       })
     )
 
