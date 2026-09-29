@@ -314,7 +314,9 @@ export class DiffHeader extends React.Component<
         onClick={onTogglePreviewFile}
         applyTooltipAriaDescribedBy={false}
       >
-        <Octicon symbol={isPreviewingFile ? octicons.fileCode : octicons.book} />
+        <Octicon
+          symbol={isPreviewingFile ? octicons.fileCode : octicons.book}
+        />
       </Button>
     )
   }
