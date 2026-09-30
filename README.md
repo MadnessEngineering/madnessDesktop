@@ -66,6 +66,9 @@ Madness Desktop is one node in a larger workshop coordination system — git eve
 
 - [Installation & data directories](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/installation.md)
 - [Authentication](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/authentication.md)
+- [Submodules, repositories, and remotes](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/submodules-and-repositories.md)
+- [Terminal, local AI, and Claude Code](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/terminal-and-ai.md)
+- [Interface: keybindings, themes, reflog, changes list](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/interface.md)
 - [Hook Loadouts](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/hook-loadouts.md)
 - [MQTT integration](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/mqtt-integration.md)
 - [The Madness ecosystem](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/ecosystem.md)

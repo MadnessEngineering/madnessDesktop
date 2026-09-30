@@ -12,6 +12,14 @@ first the features this fork adds, then the development docs it inherits from
     Omnispindle, Inventorium, and MQTT
  - **[Authentication](authentication.md)** - signing in with a personal access
     token
+ - **[Submodules, Repositories, and Remotes](submodules-and-repositories.md)** -
+    the submodule manager, nested and grouped repositories, the remotes
+    manager and branch locks
+ - **[Terminal, Local AI, and Claude Code](terminal-and-ai.md)** - the
+    integrated terminal and dotfiles panel, local-model commit messages, the
+    Claude Code hooks installer
+ - **[Interface](interface.md)** - keybindings, themes and UI voice, the
+    Reflog tab, changes-list folders, Markdown preview
  - **[Hook Loadouts](hook-loadouts.md)** - bundles of git hook scripts,
     installed and toggled per repository
  - **[MQTT Integration](mqtt-integration.md)** - publishing commits to a broker
