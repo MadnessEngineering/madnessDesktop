@@ -2,13 +2,11 @@
 
 A [GitHub Desktop](https://github.com/desktop/desktop) fork wired into the **madness_interactive** workshop — multi-machine git coordination, composable git hooks, and live workshop todos, on top of the familiar Desktop git client. Built with [Electron](https://www.electronjs.org/), [TypeScript](https://www.typescriptlang.org), and [React](https://reactjs.org/).
 
-> **Early build, build-it-yourself.** Madness Desktop runs on **macOS on Apple Silicon**, and the way to get it is to build it from source — there's no maintained download. (The [Releases](https://github.com/MadnessEngineering/madnessDesktop/releases) page has a few old builds, but they're months behind `main` and missing most of what's below.)
+> **Early build, build-it-yourself.** The way to get Madness Desktop is to build it from source — there's no maintained download. (The [Releases](https://github.com/MadnessEngineering/madnessDesktop/releases) page has a few old builds, but they're months behind `main` and missing most of what's below.)
 
 ![Madness Desktop's exploded view: the repository drawn as an isometric assembly of lettered parts, its submodule a dashed crate, with History paint marking the busiest parts in amber](docs/assets/exploded-view.png)
 
 ## Getting it
-
-You need macOS on Apple Silicon, Node `24.19.0` (see `.nvmrc`), and Yarn 1 — the full prerequisites are in [`docs/contributing/setup.md`](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/contributing/setup.md).
 
 ```sh
 git clone https://github.com/MadnessEngineering/madnessDesktop.git

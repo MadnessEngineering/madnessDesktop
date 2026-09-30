@@ -1,16 +1,10 @@
 # Installing Madness Desktop
 
-Madness Desktop runs on **macOS on Apple Silicon (arm64)**, and you build it
-from source — there's no maintained download. The
+You build Madness Desktop from source — there's no maintained download. The
 [Releases](https://github.com/MadnessEngineering/madnessDesktop/releases) page
-has a few old builds, but they're months behind `main`. The source still
-carries upstream GitHub Desktop's Windows and Linux build paths, but nobody
-builds or tests them for this fork.
+has a few old builds, but they're months behind `main`.
 
 ## Building it
-
-You need macOS, Node `24.19.0` (see `.nvmrc`), and Yarn 1 — the full
-prerequisites are in [contributing/setup.md](contributing/setup.md).
 
 ```sh
 git clone https://github.com/MadnessEngineering/madnessDesktop.git
