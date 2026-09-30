@@ -1,4 +1,6 @@
 import { hostname } from 'os'
+import { join } from 'path'
+import { chmod, mkdir, writeFile } from 'fs/promises'
 import { TokenStore } from '../stores/token-store'
 
 export interface IMqttConfig {
@@ -95,9 +97,7 @@ export async function migrateMqttPasswordIfNeeded(): Promise<string | null> {
  * These match the env vars used by the bundled hook scripts
  * (mqtt-context post-commit, todo-prefix prepare-commit-msg).
  */
-export function mqttConfigToEnv(
-  config: IMqttConfig
-): Record<string, string> {
+export function mqttConfigToEnv(config: IMqttConfig): Record<string, string> {
   if (!config.enabled) {
     return {}
   }
@@ -130,4 +130,54 @@ export function getTopicPaths(config: IMqttConfig): {
     context: `${config.topicPrefix}/${config.deviceName}/claude/git/context`,
     events: `${config.topicPrefix}/${config.deviceName}/claude/git/events`,
   }
+}
+
+/**
+ * The environment variable naming a private folder of mosquitto client
+ * options (see `writeMosquittoClientConfig`). Hook scripts point
+ * `XDG_CONFIG_HOME` at it for the mosquitto command alone.
+ */
+export const MosquittoConfigDirEnv = 'MADNESS_MQTT_CONFIG_DIR'
+
+/**
+ * Write broker credentials where `mosquitto_pub` and `mosquitto_sub` pick them
+ * up without anything on the command line: they read default options, one
+ * `-option value` per line, from `$XDG_CONFIG_HOME/mosquitto_pub` (and
+ * `…/mosquitto_sub`). Running a client with `XDG_CONFIG_HOME=<dir>` sends the
+ * credentials while keeping the password out of argv, where any local user
+ * could read it with `ps`.
+ *
+ * `dir` is created owner-only (0700), the files 0600. Returns false — and
+ * writes nothing — when there are no credentials, or when a value contains a
+ * line break, which would smuggle extra options into the file.
+ */
+export async function writeMosquittoClientConfig(
+  dir: string,
+  username: string,
+  password: string
+): Promise<boolean> {
+  if (!username && !password) {
+    return false
+  }
+  if (/[\r\n]/.test(username) || /[\r\n]/.test(password)) {
+    log.warn('MQTT: credentials contain a line break; not passing them on')
+    return false
+  }
+
+  const lines = [
+    ...(username ? [`-u ${username}`] : []),
+    ...(password ? [`-P ${password}`] : []),
+  ]
+  const contents = lines.join('\n') + '\n'
+
+  await mkdir(dir, { recursive: true, mode: 0o700 })
+  // mkdir leaves an existing folder's mode alone.
+  await chmod(dir, 0o700)
+  for (const client of ['mosquitto_pub', 'mosquitto_sub']) {
+    const file = join(dir, client)
+    await writeFile(file, contents, { mode: 0o600 })
+    // writeFile only applies the mode when it creates the file.
+    await chmod(file, 0o600)
+  }
+  return true
 }

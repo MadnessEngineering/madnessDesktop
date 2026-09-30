@@ -9,13 +9,47 @@ import { getRepoHookEnabled } from './hook-state'
 import { createHooksProxy } from './hooks-proxy'
 import { getShellEnv } from './get-shell-env'
 import memoizeOne from 'memoize-one'
-import { getMqttConfig, mqttConfigToEnv } from '../mqtt/mqtt-config'
+import {
+  getMqttConfig,
+  getMqttPassword,
+  mqttConfigToEnv,
+  MosquittoConfigDirEnv,
+  writeMosquittoClientConfig,
+} from '../mqtt/mqtt-config'
 import {
   getCacheHooksEnv,
   getGitHookEnvShell,
   getHooksEnvEnabled,
   SupportedHooksEnvShell,
 } from './config'
+
+/**
+ * The MQTT settings hook scripts read, plus — when the broker needs a login —
+ * a private credentials folder inside this operation's temporary hooks
+ * directory, so it's deleted along with it when the git command finishes.
+ */
+async function getMqttHookEnv(
+  tmpHooksDir: string
+): Promise<Record<string, string>> {
+  const config = getMqttConfig()
+  const env = mqttConfigToEnv(config)
+  if (!config.enabled) {
+    return env
+  }
+
+  const password = (await getMqttPassword().catch(() => null)) ?? ''
+  const dir = join(tmpHooksDir, 'mqtt-client')
+  const wrote = await writeMosquittoClientConfig(
+    dir,
+    config.username,
+    password
+  ).catch(e => {
+    log.warn('hooks: could not write MQTT client credentials', e)
+    return false
+  })
+
+  return wrote ? { ...env, [MosquittoConfigDirEnv]: dir } : env
+}
 
 const memoizedGetShellEnv = memoizeOne(
   async (shellKind: SupportedHooksEnvShell, cwd: string, cacheKey: string) => {
@@ -92,7 +126,7 @@ export async function withHooksEnv<T>(
       existingGitEnvConfig.length > 0 ? `${existingGitEnvConfig} ` : ''
 
     return await fn({
-      ...mqttConfigToEnv(getMqttConfig()),
+      ...(await getMqttHookEnv(tmpHooksDir)),
       GIT_CONFIG_PARAMETERS: `${gitEnvConfigPrefix}'core.hooksPath=${tmpHooksDir}'`,
       PROCESS_PROXY_PORT: `${port}`,
       PROCESS_PROXY_TOKEN: token,

@@ -14,6 +14,7 @@ set -euo pipefail
 
 DEVICE_NAME="\${DeNa:-macbook}"
 MQTT_HOST="\${MADNESS_MQTT_HOST:-localhost}"
+MQTT_PORT="\${MADNESS_MQTT_PORT:-1883}"
 GIT_CONTEXT_TOPIC="\${MADNESS_GIT_CONTEXT_TOPIC:-status/\${DEVICE_NAME}/claude/git/context}"
 GIT_EVENT_TOPIC="\${MADNESS_GIT_EVENT_TOPIC:-status/\${DEVICE_NAME}/claude/git/events}"
 GIT_CONTEXT_FILE="$(git rev-parse --git-dir 2>/dev/null)/claude-session-context.json"
@@ -38,10 +39,16 @@ PY
   TODO_SHORT_ID="\${ACTIVE_TODO_ID%%-*}"
 fi
 
-python3 - "$GIT_CONTEXT_TOPIC" "$GIT_EVENT_TOPIC" "$COMMIT_SHA" "$BRANCH_NAME" "$COMMIT_SUBJECT" "$ACTIVE_TODO_ID" "$TODO_SHORT_ID" "$NOW_UTC" "$MQTT_HOST" <<'PY'
-import json, subprocess, sys
+python3 - "$GIT_CONTEXT_TOPIC" "$GIT_EVENT_TOPIC" "$COMMIT_SHA" "$BRANCH_NAME" "$COMMIT_SUBJECT" "$ACTIVE_TODO_ID" "$TODO_SHORT_ID" "$NOW_UTC" "$MQTT_HOST" "$MQTT_PORT" <<'PY'
+import json, os, subprocess, sys
 
-context_topic, event_topic, sha, branch, subject, todo_id, todo_short, updated, mqtt_host = sys.argv[1:]
+context_topic, event_topic, sha, branch, subject, todo_id, todo_short, updated, mqtt_host, mqtt_port = sys.argv[1:]
+
+# Broker credentials, when Madness Desktop has any, come from a private
+# mosquitto options folder rather than the command line.
+client_env = dict(os.environ)
+if os.environ.get("MADNESS_MQTT_CONFIG_DIR"):
+    client_env["XDG_CONFIG_HOME"] = os.environ["MADNESS_MQTT_CONFIG_DIR"]
 
 context_payload = {
     "updated_at": updated, "state": "active", "branch": branch,
@@ -59,10 +66,10 @@ for topic, payload, retained in (
     (event_topic, event_payload, False),
 ):
     try:
-        cmd = ["mosquitto_pub", "-h", mqtt_host, "-t", topic, "-m", json.dumps(payload)]
+        cmd = ["mosquitto_pub", "-h", mqtt_host, "-p", mqtt_port, "-t", topic, "-m", json.dumps(payload)]
         if retained:
             cmd.append("-r")
-        subprocess.run(cmd, capture_output=True, timeout=3, text=True)
+        subprocess.run(cmd, capture_output=True, timeout=3, text=True, env=client_env)
     except Exception:
         pass
 PY
@@ -92,8 +99,19 @@ esac
 
 DEVICE_NAME="\${DeNa:-macbook}"
 MQTT_HOST="\${MADNESS_MQTT_HOST:-localhost}"
+MQTT_PORT="\${MADNESS_MQTT_PORT:-1883}"
 GIT_CONTEXT_TOPIC="\${MADNESS_GIT_CONTEXT_TOPIC:-status/\${DEVICE_NAME}/claude/git/context}"
 GIT_CONTEXT_FILE="$(git rev-parse --git-dir 2>/dev/null)/claude-session-context.json"
+
+# Broker credentials, when Madness Desktop has any, come from a private
+# mosquitto options folder rather than the command line.
+mqtt_sub() {
+  if [[ -n "\${MADNESS_MQTT_CONFIG_DIR:-}" ]]; then
+    XDG_CONFIG_HOME="$MADNESS_MQTT_CONFIG_DIR" mosquitto_sub "$@"
+  else
+    mosquitto_sub "$@"
+  fi
+}
 
 get_prefix_from_json() {
   local payload="$1"
@@ -122,7 +140,7 @@ if [[ -f "$GIT_CONTEXT_FILE" ]]; then
 fi
 
 if [[ -z "$PREFIX" ]]; then
-  RETAINED_PAYLOAD="$(mosquitto_sub -h "$MQTT_HOST" -t "$GIT_CONTEXT_TOPIC" -C 1 -W 1 2>/dev/null || true)"
+  RETAINED_PAYLOAD="$(mqtt_sub -h "$MQTT_HOST" -p "$MQTT_PORT" -t "$GIT_CONTEXT_TOPIC" -C 1 -W 1 2>/dev/null || true)"
   [[ -n "$RETAINED_PAYLOAD" ]] && PREFIX="$(get_prefix_from_json "$RETAINED_PAYLOAD")"
 fi
 

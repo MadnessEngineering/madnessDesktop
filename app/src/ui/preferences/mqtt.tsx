@@ -3,8 +3,15 @@ import { DialogContent } from '../dialog'
 import { TextBox } from '../lib/text-box'
 import { Button } from '../lib/button'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
-import { IMqttConfig, getTopicPaths } from '../../lib/mqtt/mqtt-config'
+import {
+  IMqttConfig,
+  getTopicPaths,
+  writeMosquittoClientConfig,
+} from '../../lib/mqtt/mqtt-config'
 import { spawn } from 'child_process'
+import { mkdtemp, rm } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
 
 interface IMqttPreferencesProps {
   readonly config: IMqttConfig
@@ -79,15 +86,11 @@ export class MqttPreferences extends React.Component<
     }
     if (testStatus.kind === 'success') {
       return (
-        <p className="mqtt-test-status mqtt-test-ok">
-          {testStatus.message}
-        </p>
+        <p className="mqtt-test-status mqtt-test-ok">{testStatus.message}</p>
       )
     }
     return (
-      <p className="mqtt-test-status mqtt-test-error">
-        {testStatus.message}
-      </p>
+      <p className="mqtt-test-status mqtt-test-error">{testStatus.message}</p>
     )
   }
 
@@ -101,9 +104,7 @@ export class MqttPreferences extends React.Component<
 
         <Checkbox
           label="Enable MQTT integration"
-          value={
-            config.enabled ? CheckboxValue.On : CheckboxValue.Off
-          }
+          value={config.enabled ? CheckboxValue.On : CheckboxValue.Off}
           onChange={this.onEnabledChanged}
         />
 
@@ -145,8 +146,8 @@ export class MqttPreferences extends React.Component<
       <div className="mqtt-section">
         <h2>Device Identity</h2>
         <p className="mqtt-description">
-          Each machine in the workshop needs a unique device name.
-          This identifies your commits and events on the shared broker.
+          Each machine in the workshop needs a unique device name. This
+          identifies your commits and events on the shared broker.
         </p>
 
         <TextBox
@@ -221,32 +222,50 @@ export class MqttPreferences extends React.Component<
   }
 }
 
+type TestResult =
+  | { kind: 'success'; message: string }
+  | { kind: 'error'; message: string }
+
 /**
- * Test MQTT connection by attempting a publish with mosquitto_pub.
- * Resolves with success/error status.
+ * Test the MQTT settings by publishing once with `mosquitto_pub` — with the
+ * same credential handling the hook scripts get, so a pass here means the
+ * hooks can publish too. Credentials go through a throwaway mosquitto options
+ * folder (see `writeMosquittoClientConfig`), never the command line.
  */
-function testMqttConnection(
-  config: IMqttConfig
-): Promise<{ kind: 'success'; message: string } | { kind: 'error'; message: string }> {
+async function testMqttConnection(config: IMqttConfig): Promise<TestResult> {
+  const configDir = await mkdtemp(join(tmpdir(), 'madness-mqtt-test-'))
+  try {
+    const hasCredentials = await writeMosquittoClientConfig(
+      join(configDir, 'client'),
+      config.username,
+      config.password
+    )
+    const env: NodeJS.ProcessEnv = hasCredentials
+      ? { ...process.env, XDG_CONFIG_HOME: join(configDir, 'client') }
+      : { ...process.env }
+    return await publishTestMessage(config, env)
+  } finally {
+    await rm(configDir, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
+function publishTestMessage(
+  config: IMqttConfig,
+  env: NodeJS.ProcessEnv
+): Promise<TestResult> {
   return new Promise(resolve => {
     const args = [
-      '-h', config.host,
-      '-p', String(config.port),
-      '-t', `${config.topicPrefix}/${config.deviceName}/madness-desktop/test`,
-      '-m', JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
+      '-h',
+      config.host,
+      '-p',
+      String(config.port),
+      '-t',
+      `${config.topicPrefix}/${config.deviceName}/madness-desktop/test`,
+      '-m',
+      JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
     ]
 
-    if (config.username) {
-      args.push('-u', config.username)
-    }
-    // Pass password via env var, not -P flag, to keep it out of argv
-    // (argv is visible to other local users via ps).
-    const spawnEnv: NodeJS.ProcessEnv = { ...process.env }
-    if (config.password) {
-      spawnEnv.MQTT_PASSWORD = config.password
-    }
-
-    const proc = spawn('mosquitto_pub', args, { timeout: 5000, env: spawnEnv })
+    const proc = spawn('mosquitto_pub', args, { timeout: 5000, env })
     let stderr = ''
 
     proc.stderr.on('data', (data: Buffer) => {
