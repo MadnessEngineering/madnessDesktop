@@ -4,6 +4,23 @@
 .changes-interstitial {
   .content.exploded {
     max-width: 960px;
+
+    // The view toggle leads the page when the drawing does.
+    > .no-changes-view-toggle {
+      margin-top: 0;
+      margin-bottom: var(--spacing-double);
+    }
+  }
+
+  // "No local changes", signing off below the drawing.
+  .no-changes-exploded-footer {
+    margin-top: var(--spacing-double);
+    padding-top: var(--spacing-double);
+    border-top: 1px solid var(--box-border-color);
+
+    .interstitial-header {
+      margin-bottom: 0;
+    }
   }
 
   .no-changes-view-toggle {

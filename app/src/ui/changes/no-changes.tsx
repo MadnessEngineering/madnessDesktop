@@ -873,37 +873,56 @@ export class NoChanges extends React.Component<
     }
   }
 
-  public render() {
+  private renderHeader(text: string, withToggle: boolean) {
     const s = getDesktopStrings()
-    const { showExplodedView } = this.state
     return (
-      <div className="changes-interstitial">
-        <div className={classNames('content', { exploded: showExplodedView })}>
-          <div className="interstitial-header">
-            <div className="text">
-              <h1>{s.noLocalChanges}</h1>
-              <p>
-                {showExplodedView
-                  ? 'There are no uncommitted changes in this repository. Here it is laid out part by part — step into a folder, or into a submodule to switch to it.'
-                  : 'There are no uncommitted changes in this repository. Here are some friendly suggestions for what to do next.'}
-              </p>
-              {this.renderViewToggle()}
-            </div>
-            <img src={PaperStackImage} className="blankslate-image" alt="" />
-          </div>
-          {showExplodedView ? (
+      <div className="interstitial-header">
+        <div className="text">
+          <h1>{s.noLocalChanges}</h1>
+          <p>{text}</p>
+          {withToggle && this.renderViewToggle()}
+        </div>
+        <img src={PaperStackImage} className="blankslate-image" alt="" />
+      </div>
+    )
+  }
+
+  public render() {
+    const { showExplodedView } = this.state
+
+    if (showExplodedView) {
+      // The drawing is the page here: it leads, with only the toggle above
+      // it, and the "no local changes" note signs off at the foot.
+      return (
+        <div className="changes-interstitial">
+          <div className="content exploded">
+            {this.renderViewToggle()}
             <ExplodedView
               repository={this.props.repository}
               dispatcher={this.props.dispatcher}
               parentRepository={this.props.parentRepository}
               changedFiles={NoChangedFiles}
             />
-          ) : (
-            <>
-              {this.renderActions()}
-              {this.renderSubmodules()}
-            </>
+            <div className="no-changes-exploded-footer">
+              {this.renderHeader(
+                'There are no uncommitted changes in this repository. Above it is laid out part by part — step into a folder, or into a submodule to switch to it.',
+                false
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="changes-interstitial">
+        <div className="content">
+          {this.renderHeader(
+            'There are no uncommitted changes in this repository. Here are some friendly suggestions for what to do next.',
+            true
           )}
+          {this.renderActions()}
+          {this.renderSubmodules()}
         </div>
       </div>
     )
