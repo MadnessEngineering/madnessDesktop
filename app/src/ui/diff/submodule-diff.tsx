@@ -21,7 +21,7 @@ import { getStatus } from '../../lib/git/status'
 import { getWorkingDirectoryDiff, getFilesDiffText } from '../../lib/git/diff'
 import { createCommit } from '../../lib/git/commit'
 import { getCommits } from '../../lib/git/log'
-import { appendIgnoreFile } from '../../lib/git/gitignore'
+import { appendIgnoreFile, appendIgnoreRule } from '../../lib/git/gitignore'
 import { IMenuItem, showContextualMenu } from '../../lib/menu-item'
 import { revealInFileManager, shell as appShell } from '../../lib/app-shell'
 import {
@@ -789,7 +789,7 @@ export class SubmoduleDiff extends React.Component<
         label: __DARWIN__
           ? `Ignore All ${extension} Files (Add to .gitignore)`
           : `Ignore all ${extension} files (add to .gitignore)`,
-        action: () => this.onIgnoreFile(`*${extension}`),
+        action: () => this.onIgnorePattern(`*${extension}`),
         enabled: !isGitIgnore,
       })
     }
@@ -872,6 +872,11 @@ export class SubmoduleDiff extends React.Component<
 
   private onIgnoreFile = async (path: string) => {
     await appendIgnoreFile(this.getSubmoduleRepo(), path)
+    await this.loadSubmoduleStatus()
+  }
+
+  private onIgnorePattern = async (pattern: string) => {
+    await appendIgnoreRule(this.getSubmoduleRepo(), pattern)
     await this.loadSubmoduleStatus()
   }
 
