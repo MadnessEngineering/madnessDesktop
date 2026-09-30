@@ -38,7 +38,8 @@ export const MaxArchiveLogEntries = 50
 
 export const DefaultChatHistoryArchiveConfig: IChatHistoryArchiveConfig = {
   enabled: false,
-  archivePath: '/Users/d.edens/lab/madness_interactive/docs/cursor_chathistory',
+  // No default: archiving moves folders, so the destination must be chosen.
+  archivePath: '',
   watchDirs: ['.specstory/history', '.claude'],
   intervalMs: 5 * 60 * 1000, // 5 minutes
   autoCommit: true,
