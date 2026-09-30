@@ -16,6 +16,7 @@ import { Octicon, syncClockwise } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { formatBytes } from '../lib/bytes'
 import { formatNumber } from '../../lib/format-number'
+import { ExplodedDrawing } from './exploded-drawing'
 
 /** Loose files listed in the hardware box before it folds into "+N more". */
 const MaxHardwareShown = 24
@@ -44,6 +45,17 @@ interface IExplodedViewState {
   readonly currentPath: string
   /** A submodule path with an init or switch in flight. */
   readonly busyPath: string | null
+  /** The part under the pointer, in the drawing or on its card. */
+  readonly hoveredPath: string | null
+}
+
+/**
+ * Dot-folders (.cursor, .github, .vscode…) are tool configuration, not parts
+ * of the build — they get a compact row of their own instead of lettered
+ * parts and blocks in the drawing.
+ */
+function isShopConfig(part: IRepositoryPart) {
+  return part.kind === 'folder' && part.name.startsWith('.')
 }
 
 function describePart(part: IRepositoryPart, sub?: SubmoduleEntry) {
@@ -99,12 +111,16 @@ interface IPartCardProps {
   readonly label: string
   readonly submodule: SubmoduleEntry | undefined
   readonly busy: boolean
+  readonly highlighted: boolean
   readonly onActivate: (part: IRepositoryPart) => void
+  readonly onHover: (path: string | null) => void
 }
 
 /** One lettered part of the assembly, with a mini blueprint of its insides. */
 class PartCard extends React.Component<IPartCardProps> {
   private onClick = () => this.props.onActivate(this.props.part)
+  private onEnter = () => this.props.onHover(this.props.part.path)
+  private onLeave = () => this.props.onHover(null)
 
   private renderBlueprint() {
     const { part } = this.props
@@ -149,14 +165,23 @@ class PartCard extends React.Component<IPartCardProps> {
   }
 
   public render() {
-    const { part, label, submodule, busy } = this.props
+    const { part, label, submodule, busy, highlighted } = this.props
     const uninitialized = submodule?.status === 'uninitialized'
 
     return (
-      <li className={classNames('exploded-part', part.kind, { uninitialized })}>
+      <li
+        className={classNames('exploded-part', part.kind, {
+          uninitialized,
+          highlighted,
+        })}
+      >
         <button
           className="exploded-part-button"
           onClick={this.onClick}
+          onMouseEnter={this.onEnter}
+          onMouseLeave={this.onLeave}
+          onFocus={this.onEnter}
+          onBlur={this.onLeave}
           disabled={busy}
         >
           <span className="exploded-part-label">{label}</span>
@@ -177,6 +202,30 @@ class PartCard extends React.Component<IPartCardProps> {
           <span className="exploded-part-action">
             {busy && <Octicon symbol={syncClockwise} className="spin" />}
             {this.actionText}
+          </span>
+        </button>
+      </li>
+    )
+  }
+}
+
+interface IShopConfigChipProps {
+  readonly part: IRepositoryPart
+  readonly onActivate: (part: IRepositoryPart) => void
+}
+
+class ShopConfigChip extends React.Component<IShopConfigChipProps> {
+  private onClick = () => this.props.onActivate(this.props.part)
+
+  public render() {
+    const { part } = this.props
+    return (
+      <li>
+        <button className="exploded-shop-chip" onClick={this.onClick}>
+          <Octicon symbol={octicons.fileDirectory} />
+          <span className="exploded-shop-chip-name">{part.name}</span>
+          <span className="exploded-shop-chip-meta">
+            {formatNumber(part.fileCount)}
           </span>
         </button>
       </li>
@@ -206,6 +255,7 @@ export class ExplodedView extends React.Component<
       submodules: new Map(),
       currentPath: '',
       busyPath: null,
+      hoveredPath: null,
     }
   }
 
@@ -241,7 +291,18 @@ export class ExplodedView extends React.Component<
   }
 
   private onNavigate = (path: string) => {
-    this.setState({ currentPath: path })
+    this.setState({ currentPath: path, hoveredPath: null })
+  }
+
+  private onHover = (hoveredPath: string | null) => {
+    this.setState({ hoveredPath })
+  }
+
+  private onActivatePath = (path: string) => {
+    const part = this.state.root && findPart(this.state.root, path)
+    if (part) {
+      this.onActivatePart(part)
+    }
   }
 
   private onOpenParent = () => {
@@ -253,7 +314,7 @@ export class ExplodedView extends React.Component<
 
   private onActivatePart = async (part: IRepositoryPart) => {
     if (part.kind === 'folder') {
-      this.setState({ currentPath: part.path })
+      this.setState({ currentPath: part.path, hoveredPath: null })
       return
     }
 
@@ -326,27 +387,25 @@ export class ExplodedView extends React.Component<
     )
   }
 
-  private renderFootprint(
-    parts: ReadonlyArray<IRepositoryPart>,
-    total: number
-  ) {
-    if (parts.length === 0) {
+  private renderShopConfig(folders: ReadonlyArray<IRepositoryPart>) {
+    if (folders.length === 0) {
       return null
     }
 
     return (
-      <div className="exploded-footprint" aria-hidden={true}>
-        {parts.map((part, i) => (
-          <div
-            key={part.path}
-            className={classNames('exploded-footprint-segment', part.kind)}
-            style={{
-              flexGrow: Math.max(total > 0 ? part.byteSize / total : 0, 0.02),
-            }}
-          >
-            <span>{partLabel(i)}</span>
-          </div>
-        ))}
+      <div className="exploded-shop">
+        <h3>
+          Shop config <span>tool dot-folders, set aside</span>
+        </h3>
+        <ul>
+          {folders.map(f => (
+            <ShopConfigChip
+              key={f.path}
+              part={f}
+              onActivate={this.onActivatePart}
+            />
+          ))}
+        </ul>
       </div>
     )
   }
@@ -386,11 +445,15 @@ export class ExplodedView extends React.Component<
 
   private renderMaterials(
     parts: ReadonlyArray<IRepositoryPart>,
+    shopConfig: ReadonlyArray<IRepositoryPart>,
     files: ReadonlyArray<IRepositoryPart>
   ) {
-    if (parts.length === 0 && files.length === 0) {
+    if (parts.length === 0 && shopConfig.length === 0 && files.length === 0) {
       return null
     }
+
+    const shopFiles = shopConfig.reduce((sum, f) => sum + f.fileCount, 0)
+    const shopBytes = shopConfig.reduce((sum, f) => sum + f.byteSize, 0)
 
     const looseBytes = files.reduce((sum, f) => sum + f.byteSize, 0)
 
@@ -435,6 +498,18 @@ export class ExplodedView extends React.Component<
               </tr>
             )
           })}
+          {shopConfig.length > 0 && (
+            <tr className="exploded-materials-hardware">
+              <td />
+              <td>Shop config</td>
+              <td>
+                {shopConfig.length} dot-
+                {shopConfig.length === 1 ? 'folder' : 'folders'}
+              </td>
+              <td className="num">{formatNumber(shopFiles)}</td>
+              <td className="num">{formatBytes(shopBytes)}</td>
+            </tr>
+          )}
           {files.length > 0 && (
             <tr className="exploded-materials-hardware">
               <td />
@@ -450,8 +525,15 @@ export class ExplodedView extends React.Component<
   }
 
   private renderBody() {
-    const { loading, root, error, currentPath, submodules, busyPath } =
-      this.state
+    const {
+      loading,
+      root,
+      error,
+      currentPath,
+      submodules,
+      busyPath,
+      hoveredPath,
+    } = this.state
 
     if (loading) {
       return (
@@ -479,7 +561,9 @@ export class ExplodedView extends React.Component<
     }
 
     const node = findPart(root, currentPath) ?? root
-    const parts = node.children.filter(c => c.kind !== 'file')
+    const nonFiles = node.children.filter(c => c.kind !== 'file')
+    const parts = nonFiles.filter(c => !isShopConfig(c))
+    const shopConfig = nonFiles.filter(isShopConfig)
     const files = node.children.filter(c => c.kind === 'file')
 
     const submoduleCount = parts.filter(p => p.kind === 'submodule').length
@@ -505,7 +589,25 @@ export class ExplodedView extends React.Component<
             <h2>Exploded view</h2>
             <span>{summary}</span>
           </div>
-          {this.renderFootprint(parts, node.byteSize)}
+          <ExplodedDrawing
+            parts={parts.map((p, i) => ({
+              path: p.path,
+              label: partLabel(i),
+              name: p.name,
+              kind: p.kind === 'submodule' ? 'submodule' : 'folder',
+              byteSize: p.byteSize,
+            }))}
+            highlightedPath={hoveredPath}
+            uninitializedPaths={
+              new Set(
+                [...submodules.values()]
+                  .filter(sub => sub.status === 'uninitialized')
+                  .map(sub => sub.path)
+              )
+            }
+            onHover={this.onHover}
+            onActivate={this.onActivatePath}
+          />
           {parts.length > 0 && (
             <ol className="exploded-assembly">
               {parts.map((part, i) => (
@@ -515,14 +617,17 @@ export class ExplodedView extends React.Component<
                   label={partLabel(i)}
                   submodule={submodules.get(part.path)}
                   busy={busyPath === part.path}
+                  highlighted={hoveredPath === part.path}
                   onActivate={this.onActivatePart}
+                  onHover={this.onHover}
                 />
               ))}
             </ol>
           )}
+          {this.renderShopConfig(shopConfig)}
           {this.renderHardware(files)}
         </div>
-        {this.renderMaterials(parts, files)}
+        {this.renderMaterials(parts, shopConfig, files)}
       </>
     )
   }
