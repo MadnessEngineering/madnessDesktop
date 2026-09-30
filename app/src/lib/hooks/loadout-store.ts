@@ -16,12 +16,8 @@ export function getInstallations(): ReadonlyArray<LoadoutInstallation> {
   }
 }
 
-export function getInstallation(
-  repoPath: string
-): LoadoutInstallation | null {
-  return (
-    getInstallations().find(i => i.repoPath === repoPath) ?? null
-  )
+export function getInstallation(repoPath: string): LoadoutInstallation | null {
+  return getInstallations().find(i => i.repoPath === repoPath) ?? null
 }
 
 export function saveInstallation(installation: LoadoutInstallation): void {
@@ -45,6 +41,21 @@ export function removeInstallation(repoPath: string): void {
   } catch {
     // localStorage unavailable
   }
+}
+
+/** Record the hashes of scripts just (re)written into an installation. */
+export function recordInstalledHashes(
+  repoPath: string,
+  hashes: Readonly<Record<string, string>>
+): void {
+  const installation = getInstallation(repoPath)
+  if (!installation) {
+    return
+  }
+  saveInstallation({
+    ...installation,
+    installedHashes: { ...installation.installedHashes, ...hashes },
+  })
 }
 
 export function toggleScript(

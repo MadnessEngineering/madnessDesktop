@@ -73,8 +73,7 @@ to:
 ```
 
 A subscriber on `status/+/claude/git/#` hears every machine. See
-[MQTT Integration](./mqtt-integration.md) for the settings and their current
-limitations.
+[MQTT Integration](./mqtt-integration.md) for the settings.
 
 ## Commits and todos
 
@@ -97,6 +96,7 @@ doesn't ask Omnispindle directly.
 - **GitHub:** a personal access token — see [Authentication](./authentication.md).
 - **Omnispindle API:** an API key (or sign-in that creates one), in Settings →
   AI Services.
-- **MQTT broker:** Madness Desktop's hooks publish anonymously — see
-  [MQTT Integration](./mqtt-integration.md#limitations).
+- **MQTT broker:** anonymous, or an optional username and password in
+  Settings → MQTT, handed to the hooks privately — see
+  [MQTT Integration](./mqtt-integration.md).
 - **Inventorium:** Auth0, in the browser.

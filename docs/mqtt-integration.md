@@ -20,10 +20,10 @@ Open **Settings → MQTT**.
 | --- | --- | --- |
 | Enable MQTT integration | on | When off, the settings below aren't passed to hooks. |
 | Broker Host | `localhost` | Where the hook scripts publish. |
-| Port | `1883` | See the note under [Limitations](#limitations). |
+| Port | `1883` | The broker's port. |
 | Device Name | this machine's hostname | Identifies this machine in the topic path. |
 | Topic Prefix | `status` | Root of every topic. |
-| Username / Password | empty | Used by **Test Connection**; see [Limitations](#limitations). |
+| Username / Password | empty | For brokers that require a login. |
 
 The **Topic Paths** preview shows what the scripts will use:
 
@@ -33,10 +33,16 @@ The **Topic Paths** preview shows what the scripts will use:
 ```
 
 **Test Connection** publishes a test message with `mosquitto_pub` using these
-settings and shows the result.
+settings — credentials included, the same way the hooks send them — and shows
+the result.
 
-The password is kept in the system keychain, not in the app's local storage,
-and is never handed to hook scripts.
+The password is kept in the system keychain, not in the app's local storage.
+For each git command the app runs, it writes the username and password into a
+private temporary mosquitto options folder (readable only by you), which the
+hook scripts hand to `mosquitto_pub` / `mosquitto_sub` through
+`XDG_CONFIG_HOME` for that one call; the folder is deleted when the command
+finishes. The password never appears on a command line or in the hooks'
+environment.
 
 ## How the settings reach the hooks
 
@@ -49,13 +55,18 @@ these variables to the hooks' environment (only while MQTT is enabled):
 | `MADNESS_MQTT_HOST` | Broker host |
 | `MADNESS_MQTT_PORT` | Broker port |
 | `MADNESS_MQTT_USERNAME` | Username, if set |
+| `MADNESS_MQTT_CONFIG_DIR` | The private credentials folder, if a username or password is set |
 | `MADNESS_GIT_CONTEXT_TOPIC` | Full context topic |
 | `MADNESS_GIT_EVENT_TOPIC` | Full events topic |
 
 Commits made **outside** the app (in a terminal) don't get these, so the
-scripts fall back to their defaults: host `localhost`, device `macbook`,
-prefix `status`. Export the same variables in your shell profile if you want
-terminal commits to publish to the same place.
+scripts fall back to their defaults: host `localhost`, port `1883`, device
+`macbook`, prefix `status`, and no login. Export the same variables in your
+shell profile if you want terminal commits to publish to the same place.
+
+Repositories whose loadout was installed before a script changed keep their
+old copy until you update it — see
+[Editing and updating scripts](./hook-loadouts.md#editing-and-updating-scripts).
 
 ## Multi-machine setup
 
@@ -70,14 +81,6 @@ status/dan-linux/claude/git/events
 For a local broker on macOS: `brew install mosquitto && brew services start
 mosquitto`.
 
-## Limitations
-
-- **Port:** the hook scripts don't pass the port to `mosquitto_pub`, so they
-  always use the default, `1883`, whatever the Port field says.
-- **Authentication:** the hook scripts don't send a username or password, so
-  publishing from hooks only works with a broker that allows anonymous
-  clients. Username and password only apply to Test Connection.
-
 ## Troubleshooting
 
 **Test Connection says `mosquitto_pub not found`** — install the clients:
@@ -86,4 +89,5 @@ mosquitto`.
 **Test Connection works, but nothing arrives from commits** — check that the
 repository has a loadout with `mqtt-context` installed and enabled
 ([Hook Loadouts](./hook-loadouts.md)), that you committed from the app (or
-exported the variables above), and the limitations above.
+exported the variables above), and that the loadout's scripts are up to date
+([Hook Loadouts](./hook-loadouts.md#editing-and-updating-scripts)).

@@ -72,9 +72,11 @@
       background: var(--box-background-color);
     }
 
+    // Dimmed while another loadout is installed. Its Install button is
+    // disabled on its own; the card stays clickable so a custom loadout can
+    // still be deleted.
     &.disabled {
       opacity: 0.5;
-      pointer-events: none;
     }
   }
 
@@ -113,6 +115,11 @@
     &.badge-builtin {
       background: rgba(142, 36, 170, 0.15);
       color: #ce93d8;
+    }
+
+    &.badge-custom {
+      background: rgba(0, 137, 123, 0.15);
+      color: #80cbc4;
     }
   }
 
@@ -173,9 +180,15 @@
 
   .loadout-script-row {
     display: flex;
-    align-items: center;
-    gap: var(--spacing-half);
+    flex-direction: column;
+    gap: 2px;
     padding: 2px 0;
+
+    .loadout-script-line {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-half);
+    }
 
     .checkbox-component {
       margin: 0;
@@ -189,12 +202,136 @@
     .loadout-script-desc {
       color: var(--text-secondary-color);
       font-size: 10px;
-      margin-left: auto;
-      text-align: right;
-      max-width: 50%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      padding-left: 22px;
+    }
+  }
+
+  // --- Script status, editor, and updates ---
+
+  .loadout-script-status {
+    font-size: 10px;
+    font-weight: var(--font-weight-semibold);
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+
+    &.current {
+      background: rgba(46, 125, 50, 0.15);
+      color: #a5d6a7;
+    }
+
+    &.outdated {
+      background: rgba(245, 124, 0, 0.18);
+      color: #ffcc80;
+    }
+
+    &.customized {
+      background: rgba(0, 137, 123, 0.15);
+      color: #80cbc4;
+    }
+  }
+
+  .loadout-link-button {
+    margin-left: auto;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--link-button-color);
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .loadout-script-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-half);
+    padding: var(--spacing-half) 0 var(--spacing-half) 22px;
+  }
+
+  .loadout-script-textarea {
+    width: 100%;
+    min-height: 180px;
+    resize: vertical;
+    padding: var(--spacing-half);
+    border: var(--base-border);
+    border-radius: 4px;
+    background: var(--box-alt-background-color);
+    color: var(--text-color);
+    font-family: var(--font-family-monospace);
+    font-size: 11px;
+    line-height: 1.45;
+    tab-size: 4;
+    white-space: pre;
+
+    &:focus {
+      outline: none;
+      border-color: var(--focus-color);
+    }
+  }
+
+  .loadout-script-editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-half);
+  }
+
+  .loadout-unsaved {
+    font-size: var(--font-size-sm);
+    color: #ffcc80;
+  }
+
+  .loadout-confirm {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-half);
+    font-size: var(--font-size-sm);
+  }
+
+  .loadout-updates {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-half);
+    margin-bottom: var(--spacing-half);
+    padding: var(--spacing-half) var(--spacing);
+    border: 1px solid rgba(245, 124, 0, 0.4);
+    border-radius: 4px;
+    background: rgba(245, 124, 0, 0.08);
+    font-size: var(--font-size-sm);
+
+    .loadout-updates-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--spacing-half);
+      justify-content: space-between;
+    }
+  }
+
+  .loadout-save-custom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-half);
+    margin-top: var(--spacing);
+    padding-top: var(--spacing-half);
+    border-top: 1px dashed var(--box-border-color);
+
+    .loadout-custom-name {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .loadout-save-custom-hint {
+      font-size: 10px;
+      color: var(--text-secondary-color);
     }
   }
 

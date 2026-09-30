@@ -30,4 +30,13 @@ export interface LoadoutInstallation {
   readonly loadoutId: string
   readonly installedAt: string
   readonly disabledScripts: ReadonlyArray<string>
+  /**
+   * sha256 of each script as Madness Desktop last wrote it, by script id.
+   * Lets the settings tell a stale copy (safe to update) from one the user
+   * edited. Absent on installations made before this was recorded.
+   */
+  readonly installedHashes?: Readonly<Record<string, string>>
 }
+
+/** How an installed script compares with the built-in version. */
+export type InstalledScriptStatus = 'current' | 'outdated' | 'customized'
