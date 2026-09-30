@@ -1,57 +1,29 @@
 # Authentication in Madness Desktop
 
-Madness Desktop is a fork of GitHub Desktop. Because the OAuth app registration belongs to GitHub, the browser OAuth callback will not redirect back to Madness Desktop. This doc covers the two working sign-in paths.
+Madness Desktop is a fork of GitHub Desktop, and GitHub's browser sign-in
+(OAuth) is registered to GitHub's own app, so it won't redirect back to
+Madness Desktop. Sign in with a personal access token instead — or, to run
+your own OAuth app, see [OAuth app setup](./oauth-app-setup.md).
 
-## Option A: Personal Access Token (PAT)
+## Personal access token
 
-This gives you full account integration — your avatar, PR status, issue links, and repository lists all work.
+This gives you the full account integration: your avatar, pull request status,
+issue links, and repository lists.
 
-### 1. Generate a PAT on GitHub
+1. On GitHub, go to **Settings → Developer settings → Personal access tokens**
+   and create one. For a classic token, enable `repo` (and `read:org` if you
+   work in organisation repositories).
+2. In Madness Desktop, open the sign-in screen (on first launch, or
+   **Settings → Accounts**), click **Use a token instead**, paste the token,
+   and submit.
 
-1. Go to **GitHub → Settings → Developer settings → Personal access tokens**
-2. Choose **Fine-grained tokens** (recommended) or **Tokens (classic)**
-3. For classic tokens, enable the `repo` scope (and `read:org` if you work with org repos)
-4. Copy the token — you won't see it again
+The token is stored in the system keychain, like any other Desktop account.
 
-### 2. Sign in to Madness Desktop
+## Git Credential Manager
 
-1. Open Madness Desktop
-2. Go to **Settings → Accounts** (or the sign-in screen on first launch)
-3. Click **"Use a token instead"** under the sign-in button
-4. Paste your PAT and submit
-
-You are now signed in with full account access.
-
----
-
-## Option B: External Credential Helper
-
-This requires no sign-in inside the app. Git operations (push, pull, fetch) use your system's existing credentials — macOS Keychain, Git Credential Manager, or whatever your shell `git` already uses.
-
-### Enable it
-
-1. Open **Settings → Advanced**
-2. Toggle on **"Use External Credential Helper"**
-3. Save and close Settings
-
-Push and pull now fall through to your system credential manager. The Accounts tab will show no signed-in account, but all git operations work.
-
-### When to use this
-
-- You already have `git push` working in your terminal for the same repos
-- You're on a machine where PAT management is handled centrally
-- You want minimal app-managed credentials
-
----
-
-## Which should I use?
-
-| | PAT | External Helper |
-|---|---|---|
-| Account features (avatar, PRs, issues) | Yes | No |
-| Push/pull works | Yes | Yes |
-| Requires GitHub token | Yes | No |
-| Uses system keychain | No | Yes |
-
-Most workshop machines: **External Helper** is fastest.  
-Primary dev machine where you want full account features: **PAT**.
+For pushing and pulling without signing in to an account, **Settings →
+Advanced → Use Git Credential Manager** hands credentials to [Git Credential
+Manager](https://gh.io/gcm). Upstream GitHub Desktop describes this as
+experimental and meant for private repositories on hosts other than
+GitHub.com. Account features — avatar, pull requests, issues — need a signed-in
+account.

@@ -1,94 +1,89 @@
 # MQTT Integration
 
-Madness Desktop can publish git context and events to an MQTT broker, enabling real-time cross-machine awareness in the madness_interactive workshop ecosystem.
+Madness Desktop can tell the rest of the workshop about your commits over
+MQTT, so other machines and tools (Omnispindle, Inventorium, your own scripts)
+see git activity as it happens.
 
-## What it does
+The app doesn't publish anything itself. The publishing is done by the
+`mqtt-context` hook script from a [hook loadout](./hook-loadouts.md); the MQTT
+settings here tell those scripts where to send it.
 
-When enabled, every commit, push, and repository context change publishes a message to your MQTT broker. Other tools on the network (Omnispindle, Inventorium, custom scripts) can subscribe to these topics and react in real time.
-
+```text
+commit → mqtt-context hook → mosquitto_pub → broker → any subscriber
 ```
-[madnessDesktop commit] → MQTT broker → [any subscriber on the network]
-                                      → Omnispindle todo tracking
-                                      → Inventorium dashboard
-                                      → Other workshop machines
-```
 
-## Configuration
+## Settings
 
 Open **Settings → MQTT**.
 
-### Connection
+| Field | Default | What it does |
+| --- | --- | --- |
+| Enable MQTT integration | on | When off, the settings below aren't passed to hooks. |
+| Broker Host | `localhost` | Where the hook scripts publish. |
+| Port | `1883` | See the note under [Limitations](#limitations). |
+| Device Name | this machine's hostname | Identifies this machine in the topic path. |
+| Topic Prefix | `status` | Root of every topic. |
+| Username / Password | empty | Used by **Test Connection**; see [Limitations](#limitations). |
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| Enable MQTT | on | Master toggle. Disabling stops all MQTT publishing. |
-| Broker Host | `localhost` | Hostname or IP of your MQTT broker |
-| Port | `1883` | Standard MQTT port. TLS typically uses `8883`. |
+The **Topic Paths** preview shows what the scripts will use:
 
-Click **Test Connection** to verify — it spawns `mosquitto_pub` with a test payload and reports success or the error message. Requires `mosquitto-clients` installed on your machine.
-
-### Device Identity
-
-| Field | Default | Description |
-|-------|---------|-------------|
-| Device Name | system hostname | Unique ID for this machine on the broker. Use something memorable (`dan-mbp`, `workshop-linux`). |
-| Topic Prefix | `status` | Root prefix for all topics. Change if you share a broker with other projects. |
-
-The **Topic Paths** preview shows the full topic strings that will be used:
-
-```
-status/{device-name}/claude/git/context   ← repository state
-status/{device-name}/claude/git/events    ← commit/push events
+```text
+<prefix>/<device>/claude/git/context   ← latest commit + active todo (retained context)
+<prefix>/<device>/claude/git/events    ← one message per commit
 ```
 
-### Authentication
+**Test Connection** publishes a test message with `mosquitto_pub` using these
+settings and shows the result.
 
-Leave blank if your broker has no auth. Otherwise provide Username and Password. These are stored in localStorage (not the system keychain).
+The password is kept in the system keychain, not in the app's local storage,
+and is never handed to hook scripts.
 
----
+## How the settings reach the hooks
 
-## Multi-machine setup
-
-Point all workshop machines at the same broker. Give each a unique **Device Name**.
-
-```
-Machine A (dan-mbp)    → status/dan-mbp/claude/git/context
-Machine B (dan-linux)  → status/dan-linux/claude/git/context
-```
-
-Any subscriber with `status/+/claude/git/#` receives events from all machines simultaneously.
-
-### Broker options
-
-- **Local broker**: `brew install mosquitto && brew services start mosquitto`
-- **Shared broker**: Set host to your server's IP or hostname (e.g. `madnessinteractive.cc`), port `4140` or your configured port
-- **Auth**: Set username/password to match your broker's ACL
-
----
-
-## Environment variables
-
-When MQTT is enabled, madnessDesktop injects these variables into every git hook execution:
+When Madness Desktop runs a git command — a commit from the app, say — it adds
+these variables to the hooks' environment (only while MQTT is enabled):
 
 | Variable | Value |
-|----------|-------|
+| --- | --- |
 | `DeNa` | Device name |
 | `MADNESS_MQTT_HOST` | Broker host |
 | `MADNESS_MQTT_PORT` | Broker port |
-| `MADNESS_GIT_CONTEXT_TOPIC` | Full context topic path |
-| `MADNESS_GIT_EVENT_TOPIC` | Full events topic path |
+| `MADNESS_MQTT_USERNAME` | Username, if set |
+| `MADNESS_GIT_CONTEXT_TOPIC` | Full context topic |
+| `MADNESS_GIT_EVENT_TOPIC` | Full events topic |
 
-Hook scripts (see [Hook Loadouts](./hook-loadouts.md)) read these variables automatically — no manual shell profile edits needed.
+Commits made **outside** the app (in a terminal) don't get these, so the
+scripts fall back to their defaults: host `localhost`, device `macbook`,
+prefix `status`. Export the same variables in your shell profile if you want
+terminal commits to publish to the same place.
 
----
+## Multi-machine setup
+
+Point every machine at the same broker and give each its own Device Name. A
+subscriber on `status/+/claude/git/#` then hears every machine.
+
+```text
+status/dan-mbp/claude/git/events
+status/dan-linux/claude/git/events
+```
+
+For a local broker on macOS: `brew install mosquitto && brew services start
+mosquitto`.
+
+## Limitations
+
+- **Port:** the hook scripts don't pass the port to `mosquitto_pub`, so they
+  always use the default, `1883`, whatever the Port field says.
+- **Authentication:** the hook scripts don't send a username or password, so
+  publishing from hooks only works with a broker that allows anonymous
+  clients. Username and password only apply to Test Connection.
 
 ## Troubleshooting
 
-**Test Connection says `mosquitto_pub not found`**
-→ Install mosquitto clients: `brew install mosquitto` (macOS) or `apt install mosquitto-clients` (Linux)
+**Test Connection says `mosquitto_pub not found`** — install the clients:
+`brew install mosquitto`.
 
-**Test Connection times out**
-→ Broker is unreachable. Check host/port and firewall rules.
-
-**Hooks run but nothing appears on broker**
-→ Verify `Enable MQTT` is on and settings were saved. Check that the hook loadout includes `mqtt-context` (see Hook Loadouts).
+**Test Connection works, but nothing arrives from commits** — check that the
+repository has a loadout with `mqtt-context` installed and enabled
+([Hook Loadouts](./hook-loadouts.md)), that you committed from the app (or
+exported the variables above), and the limitations above.
