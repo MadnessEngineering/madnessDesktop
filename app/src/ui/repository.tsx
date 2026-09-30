@@ -7,6 +7,8 @@ import { Changes, ChangesSidebar } from './changes'
 import { ReflogSidebar } from './reflog'
 import { IReflogEntry } from '../models/reflog-entry'
 import { NoChanges } from './changes/no-changes'
+import { ExplodedView } from './changes/exploded-view'
+import { Button } from './lib/button'
 import { MultipleSelection } from './changes/multiple-selection'
 import { FilesChangedBadge } from './changes/files-changed-badge'
 import { SelectedCommits, CompareSidebar } from './history'
@@ -15,6 +17,7 @@ import { TabBar } from './tab-bar'
 import {
   IRepositoryState,
   RepositorySectionTab,
+  ChangesSelection,
   ChangesSelectionKind,
   IConstrainedValue,
   CommitOptions,
@@ -194,6 +197,19 @@ interface IRepositoryViewState {
    * anchor to the same edge.
    */
   readonly openSidePanel: SidePanelKind | null
+
+  /**
+   * Show the exploded view in place of the diff while there are local
+   * changes. Cleared as soon as a different file is picked from the list.
+   */
+  readonly showExplodedView: boolean
+}
+
+/** The selected working-directory files, comparable by value. */
+function selectedFileKey(selection: ChangesSelection): string {
+  return selection.kind === ChangesSelectionKind.WorkingDirectory
+    ? selection.selectedFileIDs.join('\n')
+    : selection.kind
 }
 
 const enum Tab {
@@ -226,6 +242,7 @@ export class RepositoryView extends React.Component<
       changesListScrollTop: 0,
       compareListScrollTop: 0,
       openSidePanel: null,
+      showExplodedView: false,
     }
   }
 
@@ -666,6 +683,10 @@ export class RepositoryView extends React.Component<
       return this.renderStashedChangesContent()
     }
 
+    if (this.state.showExplodedView && workingDirectory.files.length > 0) {
+      return this.renderExplodedWithChanges()
+    }
+
     const { selectedFileIDs, diff } = selection
 
     if (selectedFileIDs.length > 1) {
@@ -726,9 +747,45 @@ export class RepositoryView extends React.Component<
             this.props.askForConfirmationOnDiscardChanges
           }
           onDiffOptionsOpened={this.onDiffOptionsOpened}
+          onShowExplodedView={this.onShowExplodedView}
         />
       )
     }
+  }
+
+  private renderExplodedWithChanges() {
+    const { files } = this.props.state.changesState.workingDirectory
+    return (
+      <div className="changes-interstitial">
+        <div className="content exploded">
+          <div className="exploded-with-changes-header">
+            <h1>Exploded view</h1>
+            <span>
+              {files.length} changed {files.length === 1 ? 'file' : 'files'}
+            </span>
+            <Button onClick={this.onHideExplodedView}>
+              {__DARWIN__ ? 'Back to Diff' : 'Back to diff'}
+            </Button>
+          </div>
+          <ExplodedView
+            key={this.props.repository.id}
+            repository={this.props.repository}
+            dispatcher={this.props.dispatcher}
+            parentRepository={this.props.parentRepository}
+            changedFiles={files}
+            defaultPaintMode="local"
+          />
+        </div>
+      </div>
+    )
+  }
+
+  private onShowExplodedView = () => {
+    this.setState({ showExplodedView: true })
+  }
+
+  private onHideExplodedView = () => {
+    this.setState({ showExplodedView: false })
   }
 
   private onOpenBinaryFile = (fullPath: string) => {
@@ -877,7 +934,16 @@ export class RepositoryView extends React.Component<
     window.removeEventListener('keydown', this.onGlobalKeyDown)
   }
 
-  public componentDidUpdate(): void {
+  public componentDidUpdate(prevProps: IRepositoryViewProps): void {
+    // Picking another file from the list means "show me that diff".
+    if (
+      this.state.showExplodedView &&
+      selectedFileKey(prevProps.state.changesState.selection) !==
+        selectedFileKey(this.props.state.changesState.selection)
+    ) {
+      this.setState({ showExplodedView: false })
+    }
+
     if (this.focusChangesNeeded) {
       this.focusChangesNeeded = false
       this.changesSidebarRef.current?.focus()

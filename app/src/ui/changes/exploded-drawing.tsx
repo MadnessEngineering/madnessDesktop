@@ -1,5 +1,6 @@
 import * as React from 'react'
 import classNames from 'classnames'
+import memoizeOne from 'memoize-one'
 
 import {
   IDrawingBox,
@@ -15,6 +16,8 @@ interface IExplodedDrawingProps {
   readonly highlightedPath: string | null
   /** Paths of submodules with nothing checked out yet. */
   readonly uninitializedPaths: ReadonlySet<string>
+  /** How strongly to paint each part's left face amber, 0–1, by path. */
+  readonly paint: ReadonlyMap<string, number>
   readonly onHover: (path: string | null) => void
   readonly onActivate: (path: string) => void
 }
@@ -23,6 +26,7 @@ interface IDrawingBoxProps {
   readonly box: IDrawingBox
   readonly highlighted: boolean
   readonly uninitialized: boolean
+  readonly paint: number
   readonly onHover: (path: string | null) => void
   readonly onActivate: (path: string) => void
 }
@@ -33,12 +37,13 @@ class DrawingBlock extends React.Component<IDrawingBoxProps> {
   private onClick = () => this.props.onActivate(this.props.box.path)
 
   public render() {
-    const { box, highlighted, uninitialized } = this.props
+    const { box, highlighted, uninitialized, paint } = this.props
     return (
       <g
         className={classNames('exploded-block', box.kind, {
           highlighted,
           uninitialized,
+          painted: paint > 0,
         })}
         onMouseEnter={this.onMouseEnter}
         onMouseLeave={this.onMouseLeave}
@@ -52,6 +57,15 @@ class DrawingBlock extends React.Component<IDrawingBoxProps> {
           y2={box.drop[1][1]}
         />
         <polygon className="face left" points={toPoints(box.left)} />
+        {paint > 0 && (
+          // One side painted, the rest left as drawn: the part is marked for
+          // work without losing the blueprint.
+          <polygon
+            className="face paint"
+            points={toPoints(box.left)}
+            style={{ fillOpacity: paint }}
+          />
+        )}
         <polygon className="face right" points={toPoints(box.right)} />
         <polygon className="face top" points={toPoints(box.top)} />
       </g>
@@ -65,13 +79,14 @@ class DrawingCallout extends React.Component<IDrawingBoxProps> {
   private onClick = () => this.props.onActivate(this.props.box.path)
 
   public render() {
-    const { box, highlighted, uninitialized } = this.props
+    const { box, highlighted, uninitialized, paint } = this.props
     const [cx, cy] = box.callout
     return (
       <g
         className={classNames('exploded-callout', box.kind, {
           highlighted,
           uninitialized,
+          painted: paint > 0,
         })}
         onMouseEnter={this.onMouseEnter}
         onMouseLeave={this.onMouseLeave}
@@ -90,6 +105,9 @@ class DrawingCallout extends React.Component<IDrawingBoxProps> {
         </text>
         <text className="exploded-callout-name" x={cx + 13} y={cy}>
           {drawingLabelText(box.name)}
+          {box.badge && (
+            <tspan className="exploded-callout-badge"> · {box.badge}</tspan>
+          )}
         </text>
       </g>
     )
@@ -101,14 +119,24 @@ class DrawingCallout extends React.Component<IDrawingBoxProps> {
  * assistive tech — the part cards below carry the same actions as buttons.
  */
 export class ExplodedDrawing extends React.Component<IExplodedDrawingProps> {
+  // Hovering re-renders on every block crossed; lay out only when the parts
+  // themselves change.
+  private layout = memoizeOne(layoutExplodedDrawing)
+
   public render() {
-    const { parts, highlightedPath, uninitializedPaths, onHover, onActivate } =
-      this.props
+    const {
+      parts,
+      highlightedPath,
+      uninitializedPaths,
+      paint,
+      onHover,
+      onActivate,
+    } = this.props
     if (parts.length === 0) {
       return null
     }
 
-    const drawing = layoutExplodedDrawing(parts)
+    const drawing = this.layout(parts)
     const [vx, vy, vw, vh] = drawing.viewBox
 
     return (
@@ -138,6 +166,7 @@ export class ExplodedDrawing extends React.Component<IExplodedDrawingProps> {
               box={box}
               highlighted={box.path === highlightedPath}
               uninitialized={uninitializedPaths.has(box.path)}
+              paint={paint.get(box.path) ?? 0}
               onHover={onHover}
               onActivate={onActivate}
             />
@@ -148,6 +177,7 @@ export class ExplodedDrawing extends React.Component<IExplodedDrawingProps> {
               box={box}
               highlighted={box.path === highlightedPath}
               uninitialized={uninitializedPaths.has(box.path)}
+              paint={paint.get(box.path) ?? 0}
               onHover={onHover}
               onActivate={onActivate}
             />

@@ -51,6 +51,9 @@ interface IDiffHeaderProps {
 
   /** Called when the user switches between the diff and the rendered file. */
   readonly onTogglePreviewFile?: () => void
+
+  /** Swap the diff pane for the exploded view; omitted, no button. */
+  readonly onShowExplodedView?: () => void
 }
 
 interface IDiffHeaderState {
@@ -157,6 +160,8 @@ export class DiffHeader extends React.Component<
           {this.renderEditButton()}
 
           {this.renderPreviewButton()}
+
+          {this.renderExplodedViewButton()}
 
           {this.renderExplainButton()}
 
@@ -283,6 +288,26 @@ export class DiffHeader extends React.Component<
         showSideBySideDiff={this.props.showSideBySideDiff}
         onDiffOptionsOpened={this.props.onDiffOptionsOpened}
       />
+    )
+  }
+
+  private renderExplodedViewButton() {
+    const { onShowExplodedView } = this.props
+    if (this.props.isEditingFile || onShowExplodedView === undefined) {
+      return null
+    }
+
+    const label = __DARWIN__ ? 'Exploded View' : 'Exploded view'
+    return (
+      <Button
+        ariaLabel={label}
+        tooltip={`${label}: see where these changes sit in the repository`}
+        className="diff-header-icon-button"
+        onClick={onShowExplodedView}
+        applyTooltipAriaDescribedBy={false}
+      >
+        <Octicon symbol={octicons.stack} />
+      </Button>
     )
   }
 

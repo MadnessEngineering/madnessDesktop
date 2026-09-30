@@ -1,10 +1,26 @@
 import * as React from 'react'
 import { join } from 'path'
 import classNames from 'classnames'
+import memoizeOne from 'memoize-one'
 
 import { Repository } from '../../models/repository'
 import { SubmoduleEntry } from '../../models/submodule'
-import { getRepositoryParts, listSubmodules } from '../../lib/git'
+import {
+  RecentTouchCommitLimit,
+  getRecentTouches,
+  getRepositoryParts,
+  listSubmodules,
+} from '../../lib/git'
+import {
+  IPaintableFile,
+  PaintMode,
+  PaintModes,
+  driftReasons,
+  isPaintMode,
+  paintIntensity,
+  tallyByPart,
+} from '../../lib/exploded-paint'
+import { IDrawingPartInput } from '../../lib/exploded-drawing'
 import {
   IRepositoryPart,
   countSubmodules,
@@ -24,6 +40,60 @@ const MaxHardwareShown = 24
 /** Sub-part blocks drawn inside a part card's mini blueprint. */
 const MaxBlueprintBlocks = 12
 
+/** Remembers the paint mode across repositories and sessions. */
+const PaintModeKey = 'exploded-view-paint-mode'
+
+const paintModeLabels: Record<PaintMode, string> = {
+  off: 'Off',
+  local: 'Local',
+  history: 'History',
+  drift: 'Drift',
+}
+
+const paintLegends: Record<Exclude<PaintMode, 'off'>, string> = {
+  local: 'Amber side: uncommitted changes housed in the part.',
+  history: `Amber side: work in the last ${RecentTouchCommitLimit} commits — the more sawdust, the brighter.`,
+  drift:
+    'Amber side: submodules moved off their pinned commit, or carrying work of their own.',
+}
+
+function readPaintMode(fallback: PaintMode): PaintMode {
+  try {
+    const stored = localStorage.getItem(PaintModeKey)
+    return isPaintMode(stored) ? stored : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function plural(n: number, one: string, many: string) {
+  return `${formatNumber(n)} ${n === 1 ? one : many}`
+}
+
+/** What a part's paint count means, in words, for its card. */
+function paintNote(
+  mode: PaintMode,
+  part: IRepositoryPart,
+  count: number,
+  reasons: ReadonlyMap<string, ReadonlyArray<string>>
+): string | null {
+  if (count === 0) {
+    return null
+  }
+  switch (mode) {
+    case 'local':
+      return `${plural(count, 'file', 'files')} changed`
+    case 'history':
+      return `touched ${formatNumber(count)}× lately`
+    case 'drift':
+      return part.kind === 'submodule'
+        ? (reasons.get(part.path) ?? []).join(', ')
+        : `${plural(count, 'submodule', 'submodules')} drifted`
+    default:
+      return null
+  }
+}
+
 interface IExplodedViewProps {
   readonly repository: Repository
   readonly dispatcher: Dispatcher
@@ -33,6 +103,15 @@ interface IExplodedViewProps {
    * way back out after stepping into a submodule.
    */
   readonly parentRepository: Repository | null
+
+  /**
+   * The working directory's changed files — what the Local and Drift paint
+   * modes mark up. Empty on the no-changes page.
+   */
+  readonly changedFiles: ReadonlyArray<IPaintableFile>
+
+  /** The paint mode to start in when the user hasn't picked one yet. */
+  readonly defaultPaintMode?: PaintMode
 }
 
 interface IExplodedViewState {
@@ -47,6 +126,9 @@ interface IExplodedViewState {
   readonly busyPath: string | null
   /** The part under the pointer, in the drawing or on its card. */
   readonly hoveredPath: string | null
+  readonly paintMode: PaintMode
+  /** Commit touches per path for History paint; null until first needed. */
+  readonly recentTouches: ReadonlyMap<string, number> | null
 }
 
 /**
@@ -112,6 +194,9 @@ interface IPartCardProps {
   readonly submodule: SubmoduleEntry | undefined
   readonly busy: boolean
   readonly highlighted: boolean
+  /** Amber intensity for the card's painted edge, 0–1. */
+  readonly paint: number
+  readonly paintNote: string | null
   readonly onActivate: (part: IRepositoryPart) => void
   readonly onHover: (path: string | null) => void
 }
@@ -165,15 +250,19 @@ class PartCard extends React.Component<IPartCardProps> {
   }
 
   public render() {
-    const { part, label, submodule, busy, highlighted } = this.props
+    const { part, label, submodule, busy, highlighted, paint, paintNote } =
+      this.props
     const uninitialized = submodule?.status === 'uninitialized'
+    const style = { '--exploded-paint': paint } as React.CSSProperties
 
     return (
       <li
         className={classNames('exploded-part', part.kind, {
           uninitialized,
           highlighted,
+          painted: paint > 0,
         })}
+        style={style}
       >
         <button
           className="exploded-part-button"
@@ -198,6 +287,9 @@ class PartCard extends React.Component<IPartCardProps> {
           <span className="exploded-part-meta">
             {describePart(part, submodule)}
           </span>
+          {paintNote !== null && (
+            <span className="exploded-part-paint-note">{paintNote}</span>
+          )}
           {this.renderBlueprint()}
           <span className="exploded-part-action">
             {busy && <Octicon symbol={syncClockwise} className="spin" />}
@@ -233,6 +325,29 @@ class ShopConfigChip extends React.Component<IShopConfigChipProps> {
   }
 }
 
+interface IPaintModeButtonProps {
+  readonly mode: PaintMode
+  readonly selected: boolean
+  readonly onSelect: (mode: PaintMode) => void
+}
+
+class PaintModeButton extends React.Component<IPaintModeButtonProps> {
+  private onClick = () => this.props.onSelect(this.props.mode)
+
+  public render() {
+    const { mode, selected } = this.props
+    return (
+      <button
+        className={classNames({ selected })}
+        aria-pressed={selected}
+        onClick={this.onClick}
+      >
+        {paintModeLabels[mode]}
+      </button>
+    )
+  }
+}
+
 /**
  * An instruction-manual exploded view of the repository: the folders and
  * submodules it's assembled from, lettered as parts, with a materials list.
@@ -246,6 +361,55 @@ export class ExplodedView extends React.Component<
 > {
   private unmounted = false
 
+  // Each mode's tally rolls every change up through its folders; memoized so
+  // hovering (which re-renders constantly) doesn't redo it.
+  private localTally = memoizeOne((files: ReadonlyArray<IPaintableFile>) =>
+    tallyByPart(files.map(f => [f.path, 1] as const))
+  )
+
+  private historyTally = memoizeOne(
+    (touches: ReadonlyMap<string, number> | null) =>
+      tallyByPart(touches ?? new Map())
+  )
+
+  private driftData = memoizeOne(
+    (
+      submodules: ReadonlyMap<string, SubmoduleEntry>,
+      files: ReadonlyArray<IPaintableFile>
+    ) => {
+      const reasons = driftReasons([...submodules.values()], files)
+      const tally = tallyByPart([...reasons.keys()].map(p => [p, 1] as const))
+      return { reasons, tally }
+    }
+  )
+
+  private uninitializedPaths = memoizeOne(
+    (submodules: ReadonlyMap<string, SubmoduleEntry>) =>
+      new Set(
+        [...submodules.values()]
+          .filter(sub => sub.status === 'uninitialized')
+          .map(sub => sub.path)
+      )
+  )
+
+  private drawingParts = memoizeOne(
+    (
+      parts: ReadonlyArray<IRepositoryPart>,
+      tally: ReadonlyMap<string, number>
+    ): ReadonlyArray<IDrawingPartInput> =>
+      parts.map((p, i) => {
+        const count = tally.get(p.path) ?? 0
+        return {
+          path: p.path,
+          label: partLabel(i),
+          name: p.name,
+          kind: p.kind === 'submodule' ? 'submodule' : 'folder',
+          byteSize: p.byteSize,
+          badge: count > 0 ? formatNumber(count) : undefined,
+        }
+      })
+  )
+
   public constructor(props: IExplodedViewProps) {
     super(props)
     this.state = {
@@ -256,15 +420,69 @@ export class ExplodedView extends React.Component<
       currentPath: '',
       busyPath: null,
       hoveredPath: null,
+      paintMode: readPaintMode(props.defaultPaintMode ?? 'off'),
+      recentTouches: null,
     }
   }
 
   public componentDidMount() {
     this.load()
+    if (this.state.paintMode === 'history') {
+      this.loadRecentTouches()
+    }
   }
 
   public componentWillUnmount() {
     this.unmounted = true
+  }
+
+  private async loadRecentTouches() {
+    try {
+      const recentTouches = await getRecentTouches(this.props.repository)
+      if (!this.unmounted) {
+        this.setState({ recentTouches })
+      }
+    } catch (e) {
+      log.error('Exploded view: could not read recent history', e)
+      if (!this.unmounted) {
+        this.setState({ recentTouches: new Map() })
+      }
+    }
+  }
+
+  private onSelectPaintMode = (paintMode: PaintMode) => {
+    try {
+      localStorage.setItem(PaintModeKey, paintMode)
+    } catch {
+      // Remembering is a nicety; the mode still switches.
+    }
+    this.setState({ paintMode })
+    if (paintMode === 'history' && this.state.recentTouches === null) {
+      this.loadRecentTouches()
+    }
+  }
+
+  private getPaint(): {
+    tally: ReadonlyMap<string, number>
+    reasons: ReadonlyMap<string, ReadonlyArray<string>>
+  } {
+    const none = new Map()
+    switch (this.state.paintMode) {
+      case 'local':
+        return {
+          tally: this.localTally(this.props.changedFiles),
+          reasons: none,
+        }
+      case 'history':
+        return {
+          tally: this.historyTally(this.state.recentTouches),
+          reasons: none,
+        }
+      case 'drift':
+        return this.driftData(this.state.submodules, this.props.changedFiles)
+      default:
+        return { tally: none, reasons: none }
+    }
   }
 
   private async load() {
@@ -410,7 +628,10 @@ export class ExplodedView extends React.Component<
     )
   }
 
-  private renderHardware(files: ReadonlyArray<IRepositoryPart>) {
+  private renderHardware(
+    files: ReadonlyArray<IRepositoryPart>,
+    tally: ReadonlyMap<string, number>
+  ) {
     if (files.length === 0) {
       return null
     }
@@ -425,7 +646,11 @@ export class ExplodedView extends React.Component<
         </h3>
         <ul>
           {shown.map(f => (
-            <li key={f.path} title={f.path}>
+            <li
+              key={f.path}
+              title={f.path}
+              className={classNames({ painted: tally.has(f.path) })}
+            >
               <Octicon symbol={octicons.file} />
               <span className="exploded-hardware-name">{f.name}</span>
               <span className="exploded-hardware-size">
@@ -524,6 +749,41 @@ export class ExplodedView extends React.Component<
     )
   }
 
+  private renderPaintSwitch(tally: ReadonlyMap<string, number>) {
+    const { paintMode, recentTouches } = this.state
+    const loadingHistory = paintMode === 'history' && recentTouches === null
+
+    return (
+      <div className="exploded-paint">
+        <div
+          className="no-changes-view-toggle exploded-paint-switch"
+          role="group"
+          aria-label="Paint"
+        >
+          <span className="exploded-paint-label">Paint</span>
+          {PaintModes.map(mode => (
+            <PaintModeButton
+              key={mode}
+              mode={mode}
+              selected={mode === paintMode}
+              onSelect={this.onSelectPaintMode}
+            />
+          ))}
+        </div>
+        {paintMode !== 'off' && (
+          <span className="exploded-paint-legend">
+            <span className="exploded-paint-swatch" aria-hidden={true} />
+            {loadingHistory
+              ? 'Reading recent history…'
+              : tally.size === 0
+              ? `${paintLegends[paintMode]} Nothing to paint right now.`
+              : paintLegends[paintMode]}
+          </span>
+        )}
+      </div>
+    )
+  }
+
   private renderBody() {
     const {
       loading,
@@ -560,11 +820,19 @@ export class ExplodedView extends React.Component<
       )
     }
 
+    const { tally, reasons } = this.getPaint()
     const node = findPart(root, currentPath) ?? root
     const nonFiles = node.children.filter(c => c.kind !== 'file')
     const parts = nonFiles.filter(c => !isShopConfig(c))
     const shopConfig = nonFiles.filter(isShopConfig)
     const files = node.children.filter(c => c.kind === 'file')
+
+    // Intensity is relative to the busiest part in view, so every level you
+    // step into uses the full range.
+    const maxPaint = Math.max(0, ...parts.map(p => tally.get(p.path) ?? 0))
+    const intensity = (path: string) =>
+      paintIntensity(tally.get(path) ?? 0, maxPaint)
+    const paintByPath = new Map(parts.map(p => [p.path, intensity(p.path)]))
 
     const submoduleCount = parts.filter(p => p.kind === 'submodule').length
     const summary = [
@@ -589,22 +857,12 @@ export class ExplodedView extends React.Component<
             <h2>Exploded view</h2>
             <span>{summary}</span>
           </div>
+          {this.renderPaintSwitch(tally)}
           <ExplodedDrawing
-            parts={parts.map((p, i) => ({
-              path: p.path,
-              label: partLabel(i),
-              name: p.name,
-              kind: p.kind === 'submodule' ? 'submodule' : 'folder',
-              byteSize: p.byteSize,
-            }))}
+            parts={this.drawingParts(parts, tally)}
             highlightedPath={hoveredPath}
-            uninitializedPaths={
-              new Set(
-                [...submodules.values()]
-                  .filter(sub => sub.status === 'uninitialized')
-                  .map(sub => sub.path)
-              )
-            }
+            uninitializedPaths={this.uninitializedPaths(submodules)}
+            paint={paintByPath}
             onHover={this.onHover}
             onActivate={this.onActivatePath}
           />
@@ -618,6 +876,13 @@ export class ExplodedView extends React.Component<
                   submodule={submodules.get(part.path)}
                   busy={busyPath === part.path}
                   highlighted={hoveredPath === part.path}
+                  paint={paintByPath.get(part.path) ?? 0}
+                  paintNote={paintNote(
+                    this.state.paintMode,
+                    part,
+                    tally.get(part.path) ?? 0,
+                    reasons
+                  )}
                   onActivate={this.onActivatePart}
                   onHover={this.onHover}
                 />
@@ -625,7 +890,7 @@ export class ExplodedView extends React.Component<
             </ol>
           )}
           {this.renderShopConfig(shopConfig)}
-          {this.renderHardware(files)}
+          {this.renderHardware(files, tally)}
         </div>
         {this.renderMaterials(parts, shopConfig, files)}
       </>

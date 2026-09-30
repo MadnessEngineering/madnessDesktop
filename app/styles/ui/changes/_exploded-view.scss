@@ -593,3 +593,107 @@
     }
   }
 }
+
+// Paint: where the work is. One amber side per part; the blueprint stays.
+.changes-interstitial .exploded-with-changes-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing);
+  margin-bottom: var(--spacing-double);
+
+  h1 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-light);
+  }
+
+  span {
+    color: var(--color-modified);
+  }
+
+  .button-component {
+    margin-left: auto;
+  }
+}
+
+.exploded-view {
+  .exploded-paint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing);
+    margin-bottom: var(--spacing);
+
+    .exploded-paint-switch {
+      margin-top: 0;
+    }
+
+    .exploded-paint-label {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 var(--spacing);
+      border-right: 1px solid var(--box-border-color);
+      color: var(--text-secondary-color);
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+  }
+
+  .exploded-paint-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-half);
+    color: var(--text-secondary-color);
+    font-size: var(--font-size-sm);
+  }
+
+  // A tiny painted side, skewed like the block faces it stands for.
+  .exploded-paint-swatch {
+    flex-shrink: 0;
+    width: 9px;
+    height: 12px;
+    background: var(--color-modified);
+    transform: skewY(30deg);
+  }
+
+  .exploded-drawing {
+    .exploded-block .face.paint {
+      fill: var(--color-modified);
+      stroke: var(--color-modified);
+      stroke-width: 0.9;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .exploded-callout .exploded-callout-badge {
+      fill: var(--color-modified);
+      font-weight: var(--font-weight-semibold);
+      font-style: normal;
+    }
+  }
+
+  .exploded-part.painted .exploded-part-button::after {
+    content: '';
+    position: absolute;
+    left: -1px;
+    top: -1px;
+    bottom: -1px;
+    width: 4px;
+    border-radius: var(--border-radius) 0 0 var(--border-radius);
+    background: var(--color-modified);
+    opacity: var(--exploded-paint, 0);
+    pointer-events: none;
+  }
+
+  .exploded-part-paint-note {
+    color: var(--color-modified);
+    font-size: var(--font-size-sm);
+  }
+
+  .exploded-hardware li.painted .exploded-hardware-name {
+    color: var(--color-modified);
+    font-weight: var(--font-weight-semibold);
+  }
+}

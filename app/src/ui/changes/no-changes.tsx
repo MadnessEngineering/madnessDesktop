@@ -57,6 +57,9 @@ function formatParentMenuLabel(menuItem: IMenuItemInfo) {
 
 const PaperStackImage = encodePathAsUrl(__dirname, 'static/paper-stack.svg')
 
+/** The no-changes page has, by definition, nothing to paint as local. */
+const NoChangedFiles: ReadonlyArray<never> = []
+
 /** Remembers whether the user last left this page on the exploded view. */
 const ExplodedViewKey = 'no-changes-show-exploded-view'
 
@@ -893,6 +896,7 @@ export class NoChanges extends React.Component<
               repository={this.props.repository}
               dispatcher={this.props.dispatcher}
               parentRepository={this.props.parentRepository}
+              changedFiles={NoChangedFiles}
             />
           ) : (
             <>

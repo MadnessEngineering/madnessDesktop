@@ -84,6 +84,9 @@ interface IChangesProps {
   /** Called when the user opens the diff options popover */
   readonly onDiffOptionsOpened: () => void
 
+  /** Swap this diff for the exploded view of the whole repository. */
+  readonly onShowExplodedView?: () => void
+
   /** Map from the emoji shortcut (e.g., :+1:) to the image's local path. */
   readonly emoji: Map<string, Emoji>
 }
@@ -357,6 +360,7 @@ export class Changes extends React.Component<IChangesProps, IChangesState> {
           canPreviewFile={this.canPreviewFile}
           isPreviewingFile={this.isPreviewingFile}
           onTogglePreviewFile={this.onTogglePreviewFile}
+          onShowExplodedView={this.props.onShowExplodedView}
         />
 
         {this.renderContents()}

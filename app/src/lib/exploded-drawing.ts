@@ -15,6 +15,8 @@ export interface IDrawingPartInput {
   readonly kind: DrawingPartKind
   /** Committed bytes; ignored for submodules, which draw at a fixed size. */
   readonly byteSize: number
+  /** A short tag drawn after the name, e.g. a paint count. */
+  readonly badge?: string
 }
 
 export type Point = readonly [number, number]
@@ -24,6 +26,7 @@ export interface IDrawingBox {
   readonly label: string
   readonly name: string
   readonly kind: DrawingPartKind
+  readonly badge?: string
   readonly top: ReadonlyArray<Point>
   readonly left: ReadonlyArray<Point>
   readonly right: ReadonlyArray<Point>
@@ -137,6 +140,7 @@ export function layoutExplodedDrawing(
       label: part.label,
       name: part.name,
       kind: part.kind,
+      badge: part.badge,
       top: [iso(x0, y0, z1), iso(x1, y0, z1), iso(x1, y1, z1), iso(x0, y1, z1)],
       left: [
         iso(x0, y1, lift),
@@ -199,7 +203,7 @@ export function layoutExplodedDrawing(
     const [cxp, cyp] = b.callout
     include([cxp - CalloutRadius, cyp - CalloutRadius])
     include([
-      cxp + CalloutRadius + 6 + drawingLabelText(b.name).length * CharWidth,
+      cxp + CalloutRadius + 6 + calloutText(b).length * CharWidth,
       cyp + CalloutRadius,
     ])
   }
@@ -215,6 +219,12 @@ export function layoutExplodedDrawing(
       maxY - minY + margin * 2,
     ],
   }
+}
+
+/** Everything drawn beside a callout: the name, then its badge if any. */
+export function calloutText(part: { name: string; badge?: string }): string {
+  const name = drawingLabelText(part.name)
+  return part.badge ? `${name} · ${part.badge}` : name
 }
 
 /** SVG `points` attribute for a polygon. */
