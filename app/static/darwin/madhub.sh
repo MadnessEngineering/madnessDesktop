@@ -24,7 +24,9 @@ if [ "$1" = "upgrade" ]; then
     echo "madhub: could not reach GitHub" >&2; exit 1; }
 
   LATEST="$(printf '%s' "$JSON" | /usr/bin/perl -ne 'if(/"tag_name":\s*"v?([^"]+)"/){print $1;last}')"
-  URL="$(printf '%s' "$JSON" | /usr/bin/perl -ne 'if(/"browser_download_url":\s*"([^"]*darwin-arm64\.zip)"/){print $1;last}')"
+  # Releases name the zip MadnessDesktop-<version>-darwin-arm64.zip; v0.1.1 and
+  # v0.1.2 shipped as Madness.Desktop-arm64.zip, so take any arm64 zip.
+  URL="$(printf '%s' "$JSON" | /usr/bin/perl -ne 'if(/"browser_download_url":\s*"([^"]*arm64\.zip)"/){print $1;last}')"
 
   if [ -z "$LATEST" ]; then echo "madhub: no release found" >&2; exit 1; fi
 
@@ -33,7 +35,7 @@ if [ "$1" = "upgrade" ]; then
     echo "madhub: already up to date (v$CURRENT)"
     exit 0
   fi
-  if [ -z "$URL" ]; then echo "madhub: no darwin-arm64 asset in v$LATEST" >&2; exit 1; fi
+  if [ -z "$URL" ]; then echo "madhub: no arm64 zip in v$LATEST" >&2; exit 1; fi
 
   echo "madhub: upgrading v$CURRENT -> v$LATEST"
   TMP="$(mktemp -d)"

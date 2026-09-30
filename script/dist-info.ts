@@ -32,8 +32,16 @@ export function getExecutableName() {
   }
 }
 
+/**
+ * The release asset name. `madhub upgrade` — in every build already shipped —
+ * finds its download by the `darwin-arm64.zip` suffix, so the zip must keep
+ * this shape: `MadnessDesktop-0.1.3-darwin-arm64.zip`. (The old
+ * `Madness Desktop-arm64.zip` lost that suffix, and GitHub turned its space
+ * into a dot on upload.)
+ */
 export function getOSXZipName() {
-  return `${productName}-${getDistArchitecture()}.zip`
+  const name = productName.replace(/\s+/g, '')
+  return `${name}-${version}-darwin-${getDistArchitecture()}.zip`
 }
 
 export function getOSXZipPath() {
