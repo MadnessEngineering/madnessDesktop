@@ -2,11 +2,21 @@
 
 A [GitHub Desktop](https://github.com/desktop/desktop) fork wired into the **madness_interactive** workshop — multi-machine git coordination, composable git hooks, and live workshop todos, on top of the familiar Desktop git client. Built with [Electron](https://www.electronjs.org/), [TypeScript](https://www.typescriptlang.org), and [React](https://reactjs.org/).
 
-> **Early build, build-it-yourself.** The way to get Madness Desktop is to build it from source — there's no maintained download. (The [Releases](https://github.com/MadnessEngineering/madnessDesktop/releases) page has a few old builds, but they're months behind `main` and missing most of what's below.)
+> **Early build.** macOS on Apple Silicon only, unsigned. Releases are cut by hand and trail the default branch; build from source for the newest code.
 
 ![Madness Desktop's exploded view: the repository drawn as an isometric assembly of lettered parts, its submodule a dashed crate, with History paint marking the busiest parts in amber](docs/assets/exploded-view.png)
 
 ## Getting it
+
+With [Homebrew](https://brew.sh) (macOS 13+, Apple Silicon), install the latest release:
+
+```sh
+brew install --cask madnessengineering/tap/madness-desktop
+```
+
+The build isn't signed or notarized, so macOS blocks the first launch. Run `xattr -dr com.apple.quarantine "/Applications/Madness Desktop.app"`, or try to open it once and click **Open Anyway** under System Settings → Privacy & Security.
+
+Or build it from source:
 
 ```sh
 git clone https://github.com/MadnessEngineering/madnessDesktop.git
@@ -19,7 +29,9 @@ Your settings live in `~/Library/Application Support/Madness Desktop`, outside t
 
 ## Keeping it updated
 
-Pull and rebuild:
+Homebrew: `brew upgrade --cask madness-desktop`.
+
+From source, pull and rebuild:
 
 ```sh
 git pull

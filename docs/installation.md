@@ -1,8 +1,34 @@
 # Installing Madness Desktop
 
-You build Madness Desktop from source — there's no maintained download. The
-[Releases](https://github.com/MadnessEngineering/madnessDesktop/releases) page
-has a few old builds, but they're months behind `main`.
+Madness Desktop runs on macOS 13+ on Apple Silicon. Install a release with
+Homebrew, or build from source for the newest code. Releases are cut by hand
+and trail the default branch.
+
+## Homebrew
+
+```sh
+brew install --cask madnessengineering/tap/madness-desktop
+```
+
+This installs the latest
+[release](https://github.com/MadnessEngineering/madnessDesktop/releases) into
+`/Applications` and links the `madhub` command. If you already have a
+from-source build there, add `--force` to replace it.
+
+The build isn't signed or notarized, so macOS blocks the first launch. Clear
+the quarantine flag:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Madness Desktop.app"
+```
+
+or try to open it once, then click **Open Anyway** under System Settings →
+Privacy & Security.
+
+Update with `brew upgrade --cask madness-desktop`. Don't use `madhub upgrade`
+on a Homebrew install: it replaces the app without telling Homebrew.
+`brew uninstall --cask madness-desktop` removes the app and keeps your data
+directory (see below); add `--zap` to delete that too.
 
 ## Building it
 
@@ -22,7 +48,7 @@ running, and installs the new app into `/Applications`. Other targets:
 - `make dev` — a development build; see
   [contributing/setup.md](contributing/setup.md) for running it.
 
-## Updating
+To update a from-source install:
 
 ```sh
 git pull
