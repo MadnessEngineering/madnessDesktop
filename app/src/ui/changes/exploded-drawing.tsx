@@ -117,7 +117,7 @@ export class ExplodedDrawing extends React.Component<IExplodedDrawingProps> {
           aria-hidden={true}
           viewBox={`${vx} ${vy} ${vw} ${vh}`}
           preserveAspectRatio="xMidYMid meet"
-          style={{ maxHeight: `${Math.min(vh * 1.4, 520)}px` }}
+          style={{ maxHeight: `${Math.min(vh * 1.6, 560)}px` }}
         >
           <polygon
             className="exploded-plate"

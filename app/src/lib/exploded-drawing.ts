@@ -53,6 +53,31 @@ const CharWidth = 5.6
 const MaxLabelChars = 16
 const CalloutRadius = 9
 
+/**
+ * Columns × rows for n parts: the fewest empty cells, then the wider grid —
+ * an empty cell is a hole in the plate, and the sheet is wider than tall.
+ * Never more than twice as wide as deep, or the plate thins to a diagonal
+ * plank.
+ */
+export function gridFor(n: number): readonly [number, number] {
+  if (n <= 1) {
+    return [1, 1]
+  }
+  const lo = Math.ceil(Math.sqrt(n))
+  const hi = Math.max(lo, Math.ceil(Math.sqrt(n * 2.5)))
+  let best: [number, number] = [lo, Math.ceil(n / lo)]
+  for (let cols = lo; cols <= hi; cols++) {
+    const rows = Math.ceil(n / cols)
+    if (cols > rows * 2) {
+      continue
+    }
+    if (cols * rows - n <= best[0] * best[1] - n) {
+      best = [cols, rows]
+    }
+  }
+  return best
+}
+
 /** Project ground coordinates (x, y) at height z onto the page. */
 export function iso(x: number, y: number, z: number): Point {
   return [(x - y) * Cos30, (x + y) * Sin30 - z]
@@ -69,16 +94,19 @@ export function layoutExplodedDrawing(
   parts: ReadonlyArray<IDrawingPartInput>
 ): IExplodedDrawing {
   const n = parts.length
-  const cols = Math.max(1, Math.ceil(Math.sqrt(n)))
-  const rows = Math.max(1, Math.ceil(n / cols))
+  const [cols, rows] = gridFor(n)
+  // Empty cells go at the back corner, where the lifted blocks of the rows
+  // in front cover for them — never the front tip of the plate.
+  const empty = cols * rows - n
   const maxBytes = parts.reduce(
     (max, p) => (p.kind === 'folder' ? Math.max(max, p.byteSize) : max),
     0
   )
 
   const boxes = parts.map((part, i) => {
-    const col = i % cols
-    const row = Math.floor(i / cols)
+    const cell = i + empty
+    const col = cell % cols
+    const row = Math.floor(cell / cols)
     const cx = col * Cell + Cell / 2
     const cy = row * Cell + Cell / 2
 
@@ -159,9 +187,15 @@ export function layoutExplodedDrawing(
     maxX = Math.max(maxX, x)
     maxY = Math.max(maxY, y)
   }
-  plate.forEach(include)
+  // Frame what's drawn, not the whole plate: the plate runs on past the
+  // edges like the cut-off base in a manual's detail view, and the parts get
+  // the room its empty corners would have taken.
+  if (ordered.length === 0) {
+    plate.forEach(include)
+  }
   for (const b of ordered) {
     b.top.forEach(include)
+    b.footprint.forEach(include)
     const [cxp, cyp] = b.callout
     include([cxp - CalloutRadius, cyp - CalloutRadius])
     include([

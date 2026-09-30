@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import {
   IDrawingPartInput,
   drawingLabelText,
+  gridFor,
   iso,
   layoutExplodedDrawing,
   toPoints,
@@ -25,6 +26,28 @@ describe('exploded drawing', () => {
     const [x, y] = iso(10, 0, 0)
     assert.ok(x > 0 && y > 0)
     assert.deepStrictEqual(iso(0, 0, 5), [0, -5])
+  })
+
+  it('picks the grid with the fewest holes, preferring wider', () => {
+    assert.deepStrictEqual(gridFor(0), [1, 1])
+    assert.deepStrictEqual(gridFor(1), [1, 1])
+    assert.deepStrictEqual(gridFor(4), [2, 2])
+    assert.deepStrictEqual(gridFor(7), [4, 2])
+    assert.deepStrictEqual(gridFor(14), [5, 3])
+    for (let n = 2; n < 60; n++) {
+      const [cols, rows] = gridFor(n)
+      assert.ok(cols * rows >= n, `grid for ${n} holds every part`)
+      assert.ok(cols >= rows, `grid for ${n} is at least as wide as deep`)
+    }
+  })
+
+  it('leaves the front corner of the plate filled', () => {
+    // 7 parts on a 4×2 grid: the one hole is at the back, so the last part
+    // sits in the front cell and paints last.
+    const d = layoutExplodedDrawing(
+      Array.from({ length: 7 }, (_, i) => part(`P${i}`, 10))
+    )
+    assert.strictEqual(d.boxes[d.boxes.length - 1].label, 'P6')
   })
 
   it('lays out one box per part, back to front', () => {
