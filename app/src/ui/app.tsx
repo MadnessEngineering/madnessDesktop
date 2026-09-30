@@ -4608,6 +4608,19 @@ export class App extends React.Component<IAppProps, IAppState> {
           r instanceof Repository &&
           isPathInside(r.path, selectedState.repository.path)
       )
+      // The closest tracked repository enclosing this one — the exploded
+      // view's way back out of a submodule.
+      let parentRepository: Repository | null = null
+      for (const r of state.repositories) {
+        if (
+          r instanceof Repository &&
+          isPathInside(selectedState.repository.path, r.path) &&
+          (parentRepository === null ||
+            r.path.length > parentRepository.path.length)
+        ) {
+          parentRepository = r
+        }
+      }
       return (
         <RepositoryView
           ref={this.repositoryViewRef}
@@ -4616,6 +4629,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           key={selectedState.repository.hash}
           repository={selectedState.repository}
           submoduleRepositories={submoduleRepositories}
+          parentRepository={parentRepository}
           state={selectedState.state}
           dispatcher={this.props.dispatcher}
           emoji={state.emoji}

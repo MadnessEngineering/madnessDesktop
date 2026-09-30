@@ -133,6 +133,9 @@ interface IRepositoryViewProps {
   /** Repositories that live inside this repo's path (direct submodule repos). */
   readonly submoduleRepositories: ReadonlyArray<Repository>
 
+  /** The closest tracked repository this one lives inside, if any. */
+  readonly parentRepository: Repository | null
+
   /** Whether or not to show the changes filter */
   readonly showChangesFilter: boolean
 
@@ -686,6 +689,7 @@ export class RepositoryView extends React.Component<
             }
             submoduleRepositories={this.props.submoduleRepositories}
             onShowSubmodulePanel={this.onShowSubmodulePanel}
+            parentRepository={this.props.parentRepository}
           />
         )
       }

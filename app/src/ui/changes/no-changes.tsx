@@ -33,6 +33,9 @@ import {
 import { KeyboardShortcut } from '../keyboard-shortcut/keyboard-shortcut'
 import { formatNumber } from '../../lib/format-number'
 import { getDesktopStrings } from '../lib/theme-strings-context'
+import classNames from 'classnames'
+import { getBoolean, setBoolean } from '../../lib/local-storage'
+import { ExplodedView } from './exploded-view'
 
 function formatMenuItemLabel(text: string) {
   if (__WIN32__ || __LINUX__) {
@@ -53,6 +56,9 @@ function formatParentMenuLabel(menuItem: IMenuItemInfo) {
 }
 
 const PaperStackImage = encodePathAsUrl(__dirname, 'static/paper-stack.svg')
+
+/** Remembers whether the user last left this page on the exploded view. */
+const ExplodedViewKey = 'no-changes-show-exploded-view'
 
 interface INoChangesProps {
   readonly dispatcher: Dispatcher
@@ -91,6 +97,9 @@ interface INoChangesProps {
 
   /** Opens the repository view's submodule side panel. */
   readonly onShowSubmodulePanel: () => void
+
+  /** The tracked repository this one sits inside, if any. */
+  readonly parentRepository: Repository | null
 }
 
 /**
@@ -143,6 +152,9 @@ interface INoChangesState {
    * initially appearing.
    */
   readonly enableTransitions: boolean
+
+  /** Show the exploded parts view in place of the suggested actions. */
+  readonly showExplodedView: boolean
 }
 
 function getItemAcceleratorKeys(item: MenuItem) {
@@ -208,7 +220,38 @@ export class NoChanges extends React.Component<
     super(props)
     this.state = {
       enableTransitions: false,
+      showExplodedView: getBoolean(ExplodedViewKey, false),
     }
+  }
+
+  private setExplodedView(showExplodedView: boolean) {
+    setBoolean(ExplodedViewKey, showExplodedView)
+    this.setState({ showExplodedView })
+  }
+
+  private onShowSuggestions = () => this.setExplodedView(false)
+  private onShowExplodedView = () => this.setExplodedView(true)
+
+  private renderViewToggle() {
+    const { showExplodedView } = this.state
+    return (
+      <div className="no-changes-view-toggle" role="group" aria-label="View">
+        <button
+          className={classNames({ selected: !showExplodedView })}
+          aria-pressed={!showExplodedView}
+          onClick={this.onShowSuggestions}
+        >
+          Suggestions
+        </button>
+        <button
+          className={classNames({ selected: showExplodedView })}
+          aria-pressed={showExplodedView}
+          onClick={this.onShowExplodedView}
+        >
+          Exploded view
+        </button>
+      </div>
+    )
   }
 
   private getMenuItemInfo(menuItemId: MenuIDs): IMenuItemInfo | undefined {
@@ -829,21 +872,34 @@ export class NoChanges extends React.Component<
 
   public render() {
     const s = getDesktopStrings()
+    const { showExplodedView } = this.state
     return (
       <div className="changes-interstitial">
-        <div className="content">
+        <div className={classNames('content', { exploded: showExplodedView })}>
           <div className="interstitial-header">
             <div className="text">
               <h1>{s.noLocalChanges}</h1>
               <p>
-                There are no uncommitted changes in this repository. Here are
-                some friendly suggestions for what to do next.
+                {showExplodedView
+                  ? 'There are no uncommitted changes in this repository. Here it is laid out part by part — step into a folder, or into a submodule to switch to it.'
+                  : 'There are no uncommitted changes in this repository. Here are some friendly suggestions for what to do next.'}
               </p>
+              {this.renderViewToggle()}
             </div>
             <img src={PaperStackImage} className="blankslate-image" alt="" />
           </div>
-          {this.renderActions()}
-          {this.renderSubmodules()}
+          {showExplodedView ? (
+            <ExplodedView
+              repository={this.props.repository}
+              dispatcher={this.props.dispatcher}
+              parentRepository={this.props.parentRepository}
+            />
+          ) : (
+            <>
+              {this.renderActions()}
+              {this.renderSubmodules()}
+            </>
+          )}
         </div>
       </div>
     )

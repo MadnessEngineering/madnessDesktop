@@ -1,0 +1,414 @@
+// The "No local changes" page's exploded parts view — an instruction-manual
+// sheet: blueprint grid, lettered part callouts, dashed assembly lines.
+
+.changes-interstitial {
+  .content.exploded {
+    max-width: 960px;
+  }
+
+  .no-changes-view-toggle {
+    display: inline-flex;
+    margin-top: var(--spacing);
+    border: 1px solid var(--box-border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+
+    button {
+      padding: var(--spacing-half) var(--spacing);
+      background: transparent;
+      border: none;
+      color: var(--text-secondary-color);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+
+      & + button {
+        border-left: 1px solid var(--box-border-color);
+      }
+
+      &:hover {
+        background: var(--list-item-hover-background-color);
+      }
+
+      &.selected {
+        background: var(--list-item-selected-background-color);
+        color: var(--text-color);
+        font-weight: var(--font-weight-semibold);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--focus-color);
+        outline-offset: -2px;
+      }
+    }
+  }
+}
+
+.exploded-view {
+  --exploded-ink: var(--focus-color);
+  --exploded-grid: color-mix(in srgb, var(--focus-color) 7%, transparent);
+  --exploded-folder-fill: color-mix(in srgb, var(--focus-color) 22%, transparent);
+  --exploded-submodule-fill: color-mix(in srgb, var(--text-secondary-color) 22%, transparent);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-double);
+
+  .exploded-breadcrumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-third);
+    font-size: var(--font-size-sm);
+
+    .exploded-crumb {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-third);
+      padding: var(--spacing-third) var(--spacing-half);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--border-radius);
+      color: var(--link-button-color);
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        border-color: var(--box-border-color);
+      }
+
+      &.current,
+      &:disabled {
+        color: var(--text-color);
+        font-weight: var(--font-weight-semibold);
+        cursor: default;
+      }
+    }
+
+    .exploded-crumb-parent {
+      border-style: dashed;
+      border-color: var(--box-border-color);
+    }
+
+    .exploded-crumb-sep {
+      color: var(--text-secondary-color);
+      height: 12px;
+    }
+  }
+
+  .exploded-message {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+    color: var(--text-secondary-color);
+  }
+
+  .exploded-sheet {
+    padding: var(--spacing-double);
+    border: 1px solid var(--box-border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--box-alt-background-color);
+    background-image: linear-gradient(var(--exploded-grid) 1px, transparent 1px), linear-gradient(90deg, var(--exploded-grid) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  .exploded-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--spacing);
+    margin-bottom: var(--spacing);
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-semibold);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--exploded-ink);
+    }
+
+    span {
+      color: var(--text-secondary-color);
+      font-size: var(--font-size-sm);
+    }
+  }
+
+  // The assembled piece, drawn to scale by committed size.
+  .exploded-footprint {
+    display: flex;
+    gap: 2px;
+    height: 22px;
+    margin-bottom: var(--spacing-double);
+
+    .exploded-footprint-segment {
+      flex-basis: 0;
+      min-width: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px solid var(--exploded-ink);
+      border-radius: 2px;
+      background: var(--exploded-folder-fill);
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-semibold);
+
+      &.submodule {
+        border-style: dashed;
+        border-color: var(--text-secondary-color);
+        background: var(--exploded-submodule-fill);
+      }
+    }
+  }
+
+  // The parts, pulled apart along dashed assembly lines.
+  .exploded-assembly {
+    list-style: none;
+    margin: 0;
+    padding: var(--spacing) 0 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    // Rows get extra room for the stagger below plus the callout circles.
+    gap: calc(var(--spacing) * 4) var(--spacing-double);
+  }
+
+  .exploded-part {
+    position: relative;
+
+    // Stagger the parts so the sheet reads as pulled apart, not tabulated.
+    &:nth-child(3n + 2) {
+      transform: translateY(var(--spacing));
+    }
+    &:nth-child(3n) {
+      transform: translateY(calc(var(--spacing) * -0.5));
+    }
+
+    // The dashed line each part was pulled out along.
+    &::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: calc(var(--spacing) * -1);
+      height: var(--spacing);
+      border-left: 1px dashed var(--exploded-ink);
+      opacity: 0.6;
+    }
+  }
+
+  .exploded-part-button {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-half);
+    padding: var(--spacing) var(--spacing) var(--spacing-half);
+    text-align: left;
+    color: var(--text-color);
+    background: var(--background-color);
+    border: 1px solid var(--exploded-ink);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+
+    &:hover:not(:disabled) {
+      transform: translate(-2px, -2px);
+      box-shadow: 3px 3px 0 var(--exploded-folder-fill);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--focus-color-alpha);
+    }
+
+    &:disabled {
+      cursor: progress;
+    }
+  }
+
+  .exploded-part.submodule .exploded-part-button {
+    border-style: dashed;
+    border-color: var(--text-secondary-color);
+  }
+
+  .exploded-part.uninitialized .exploded-part-button {
+    opacity: 0.75;
+  }
+
+  // The circled instruction-manual callout.
+  .exploded-part-label {
+    position: absolute;
+    top: -11px;
+    right: var(--spacing);
+    min-width: 22px;
+    height: 22px;
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--exploded-ink);
+    border-radius: 11px;
+    background: var(--background-color);
+    color: var(--exploded-ink);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .exploded-part-heading {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-half);
+    min-width: 0;
+
+    .octicon {
+      flex-shrink: 0;
+      color: var(--text-secondary-color);
+    }
+  }
+
+  .exploded-part-name {
+    font-weight: var(--font-weight-semibold);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .exploded-part-meta {
+    color: var(--text-secondary-color);
+    font-size: var(--font-size-sm);
+  }
+
+  .exploded-part-blueprint {
+    display: flex;
+    gap: 2px;
+    height: 10px;
+
+    .exploded-part-block {
+      flex-basis: 0;
+      min-width: 3px;
+      border: 1px solid var(--exploded-ink);
+      border-radius: 1px;
+      background: var(--exploded-folder-fill);
+
+      &.submodule {
+        border-style: dashed;
+        border-color: var(--text-secondary-color);
+        background: var(--exploded-submodule-fill);
+      }
+    }
+  }
+
+  .exploded-part-action {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-third);
+    margin-top: auto;
+    color: var(--link-button-color);
+    font-size: var(--font-size-sm);
+  }
+
+  // Loose files at this level: the bag of screws.
+  .exploded-hardware {
+    margin-top: var(--spacing-double);
+    padding: var(--spacing);
+    border: 1px dashed var(--box-border-color);
+    border-radius: var(--border-radius);
+    background: var(--background-color);
+
+    h3 {
+      margin: 0 0 var(--spacing-half);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+
+      span {
+        margin-left: var(--spacing-half);
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: normal;
+        color: var(--text-secondary-color);
+      }
+    }
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: var(--spacing-third) var(--spacing);
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-third);
+      min-width: 0;
+      font-size: var(--font-size-sm);
+
+      .octicon {
+        flex-shrink: 0;
+        color: var(--text-secondary-color);
+      }
+    }
+
+    .exploded-hardware-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .exploded-hardware-size {
+      margin-left: auto;
+      color: var(--text-secondary-color);
+      white-space: nowrap;
+    }
+
+    .exploded-hardware-more {
+      color: var(--text-secondary-color);
+    }
+  }
+
+  .exploded-materials {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+
+    caption {
+      text-align: left;
+      padding-bottom: var(--spacing-half);
+      font-weight: var(--font-weight-semibold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary-color);
+    }
+
+    th,
+    td {
+      padding: var(--spacing-third) var(--spacing-half);
+      border-bottom: 1px solid var(--box-border-color);
+      text-align: left;
+    }
+
+    th {
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-secondary-color);
+    }
+
+    .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .exploded-materials-label {
+      width: 2.5em;
+      font-weight: var(--font-weight-semibold);
+      color: var(--exploded-ink);
+    }
+
+    .exploded-materials-hardware td {
+      color: var(--text-secondary-color);
+      font-style: italic;
+    }
+  }
+}

@@ -2297,6 +2297,18 @@ export class Dispatcher {
   }
 
   /**
+   * Switch to the repository at a submodule's path, adding it to the list
+   * first if it isn't tracked yet. The exploded view's "step into" for a
+   * submodule part.
+   */
+  public async openSubmoduleRepository(path: string): Promise<void> {
+    const repository = await this.resolveOrAddRepository(path)
+    if (repository !== null) {
+      await this.selectRepository(repository)
+    }
+  }
+
+  /**
    * Drop a repository into a custom group by name, creating the group if no
    * group with that name exists yet. The CLI's "group via tag" entry point.
    */
