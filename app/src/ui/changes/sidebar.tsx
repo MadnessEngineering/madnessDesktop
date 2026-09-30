@@ -292,6 +292,18 @@ export class ChangesSidebar extends React.Component<IChangesSidebarProps, {}> {
     }
   }
 
+  private onIgnoreAndUntrackFile = async (file: string | string[]) => {
+    try {
+      await this.props.dispatcher.ignoreAndUntrackFile(
+        this.props.repository,
+        file
+      )
+    } catch (error) {
+      log.error('Failed to ignore and untrack file(s)', error)
+      await this.props.dispatcher.postError(error)
+    }
+  }
+
   private onIgnorePattern = async (pattern: string | string[]) => {
     try {
       await this.props.dispatcher.appendIgnoreRule(
@@ -482,6 +494,7 @@ export class ChangesSidebar extends React.Component<IChangesSidebarProps, {}> {
           autocompletionProviders={this.autocompletionProviders!}
           availableWidth={this.props.availableWidth}
           onIgnoreFile={this.onIgnoreFile}
+          onIgnoreAndUntrackFile={this.onIgnoreAndUntrackFile}
           onIgnorePattern={this.onIgnorePattern}
           isCommitting={this.props.isCommitting}
           hookProgress={this.props.hookProgress}

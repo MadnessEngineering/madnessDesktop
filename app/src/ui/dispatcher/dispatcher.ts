@@ -1707,6 +1707,17 @@ export class Dispatcher {
     return this.appStore._appendIgnoreFile(repository, filePath)
   }
 
+  /**
+   * Add the given file or folder path(s) to the repository's gitignore and
+   * stop tracking them, leaving them on disk.
+   */
+  public ignoreAndUntrackFile(
+    repository: Repository,
+    filePath: string | string[]
+  ): Promise<void> {
+    return this.appStore._ignoreAndUntrackFile(repository, filePath)
+  }
+
   /** Opens a Git-enabled terminal setting the working directory to the repository path */
   public async openShell(
     path: string,

@@ -197,6 +197,12 @@ interface IFilterChangesListProps {
   /** Called when the given file should be ignored. */
   readonly onIgnoreFile: (pattern: string | string[]) => void
 
+  /**
+   * Called when the given file or folder should be ignored and, since it's
+   * already tracked, removed from the index (kept on disk).
+   */
+  readonly onIgnoreAndUntrackFile: (pattern: string | string[]) => void
+
   /** Called when the given pattern should be ignored. */
   readonly onIgnorePattern: (pattern: string | string[]) => void
 
@@ -995,6 +1001,12 @@ export class FilterChangesList extends React.Component<
       this.getDiscardChangesMenuItem(paths),
       { type: 'separator' },
     ]
+    // Ignoring a file git already tracks has no effect until it's removed
+    // from the index, so tracked files also get an ignore-and-untrack item.
+    const isTracked = (f: WorkingDirectoryFileChange) =>
+      f.status.kind !== AppFileStatusKind.Untracked &&
+      f.status.kind !== AppFileStatusKind.Conflicted
+
     if (paths.length === 1) {
       const enabled = Path.basename(path) !== GitIgnoreFileName
       items.push({
@@ -1005,44 +1017,79 @@ export class FilterChangesList extends React.Component<
         enabled,
       })
 
+      if (isTracked(file)) {
+        items.push({
+          label: __DARWIN__
+            ? 'Ignore and Untrack File (Keep on Disk)'
+            : 'Ignore and untrack file (keep on disk)',
+          action: () => this.props.onIgnoreAndUntrackFile(path),
+          enabled,
+        })
+      }
+
       // Even on Windows, the path separator is '/' for git operations so cannot
       // use Path.sep
       const pathComponents = path.split('/').slice(0, -1)
       if (pathComponents.length > 0) {
-        const submenu = pathComponents.map((_, index) => {
-          const label = `/${pathComponents
-            .slice(0, pathComponents.length - index)
-            .join('/')}`
-          return {
-            label,
-            action: () => this.props.onIgnoreFile(label),
-          }
-        })
+        const folders = pathComponents.map(
+          (_, index) =>
+            `/${pathComponents
+              .slice(0, pathComponents.length - index)
+              .join('/')}`
+        )
 
         items.push({
           label: __DARWIN__
             ? 'Ignore Folder (Add to .gitignore)'
             : 'Ignore folder (add to .gitignore)',
-          submenu,
+          submenu: folders.map(label => ({
+            label,
+            action: () => this.props.onIgnoreFile(label),
+          })),
           enabled,
         })
+
+        if (isTracked(file)) {
+          items.push({
+            label: __DARWIN__
+              ? 'Ignore and Untrack Folder (Keep on Disk)'
+              : 'Ignore and untrack folder (keep on disk)',
+            submenu: folders.map(label => ({
+              label,
+              action: () => this.props.onIgnoreAndUntrackFile(label),
+            })),
+            enabled,
+          })
+        }
       }
     } else if (paths.length > 1) {
+      // Filter out any .gitignores that happens to be selected, ignoring
+      // those doesn't make sense.
+      const ignorablePaths = paths.filter(
+        path => Path.basename(path) !== GitIgnoreFileName
+      )
+
       items.push({
         label: __DARWIN__
           ? `Ignore ${paths.length} Selected Files (Add to .gitignore)`
           : `Ignore ${paths.length} selected files (add to .gitignore)`,
-        action: () => {
-          // Filter out any .gitignores that happens to be selected, ignoring
-          // those doesn't make sense.
-          this.props.onIgnoreFile(
-            paths.filter(path => Path.basename(path) !== GitIgnoreFileName)
-          )
-        },
+        action: () => this.props.onIgnoreFile(ignorablePaths),
         // Enable this action as long as there's something selected which isn't
         // a .gitignore file.
-        enabled: paths.some(path => Path.basename(path) !== GitIgnoreFileName),
+        enabled: ignorablePaths.length > 0,
       })
+
+      const anyTracked = selectedFiles.some(
+        f => isTracked(f) && Path.basename(f.path) !== GitIgnoreFileName
+      )
+      if (anyTracked) {
+        items.push({
+          label: __DARWIN__
+            ? `Ignore and Untrack ${paths.length} Selected Files (Keep on Disk)`
+            : `Ignore and untrack ${paths.length} selected files (keep on disk)`,
+          action: () => this.props.onIgnoreAndUntrackFile(ignorablePaths),
+        })
+      }
     }
     // Five menu items should be enough for everyone
     Array.from(extensions)

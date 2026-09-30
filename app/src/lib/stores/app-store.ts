@@ -255,6 +255,7 @@ import {
   getRebaseInternalState,
   getCommit,
   appendIgnoreFile,
+  ignoreAndUntrack,
   getRepositoryType,
   RepositoryType,
   listWorktrees,
@@ -9039,6 +9040,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
     filePath: string | string[]
   ): Promise<void> {
     await appendIgnoreFile(repository, filePath)
+    return this._refreshRepository(repository)
+  }
+
+  public async _ignoreAndUntrackFile(
+    repository: Repository,
+    filePath: string | string[]
+  ): Promise<void> {
+    await ignoreAndUntrack(repository, filePath)
     return this._refreshRepository(repository)
   }
 

@@ -4,6 +4,7 @@ import { Repository } from '../../models/repository'
 import { getConfigValue } from './config'
 import { lstat, open, type FileHandle } from 'fs/promises'
 import { isErrnoException } from '../errno-exception'
+import { removeFromIndex } from './rm'
 
 const symbolicLinkErrorMessage =
   'Cannot use a symbolic link as the root .gitignore file'
@@ -172,6 +173,29 @@ export async function appendIgnoreFile(
 
   const escapedFilePath = escapeGitSpecialCharacters(filePath)
   return appendIgnoreRule(repository, escapedFilePath)
+}
+
+/**
+ * Add the given file or folder path(s) to the repository's gitignore and stop
+ * tracking them, leaving them on disk. Once committed, the path is ignored
+ * even though it used to be tracked.
+ *
+ * Folder paths may be anchored to the root with a leading '/', as the ignore
+ * menus do.
+ */
+export async function ignoreAndUntrack(
+  repository: Repository,
+  filePath: string | string[]
+): Promise<void> {
+  // Ignore first: if the path is untracked before it's ignored, status shows
+  // it as untracked instead of deleted.
+  await appendIgnoreFile(repository, filePath)
+
+  const paths = filePath instanceof Array ? filePath : [filePath]
+  await removeFromIndex(
+    repository,
+    paths.map(path => path.replace(/^\//, ''))
+  )
 }
 
 /** Escapes a string from special characters used in a gitignore file */

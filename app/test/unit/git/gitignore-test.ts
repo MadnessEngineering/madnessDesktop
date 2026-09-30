@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { readFile, symlink, writeFile } from 'fs/promises'
+import { mkdir, readFile, symlink, writeFile } from 'fs/promises'
 import { pathExists } from '../../../src/lib/path-exists'
 import * as Path from 'path'
 import { exec } from 'dugite'
@@ -13,7 +13,11 @@ import {
   appendIgnoreRule,
   escapeGitSpecialCharacters,
   appendIgnoreFile,
+  ignoreAndUntrack,
+  createCommit,
 } from '../../../src/lib/git'
+import { Repository } from '../../../src/models/repository'
+import { AppFileStatusKind } from '../../../src/models/status'
 import { setupLocalConfig } from '../../helpers/local-config'
 
 describe('gitignore', () => {
@@ -252,6 +256,115 @@ describe('gitignore', () => {
       const expected =
         'node_modules\n' + '\\[never\\]\\!gonna\\*give\\#you\\?_.up\n'
       assert.equal(gitignore.toString('utf8'), expected)
+    })
+  })
+
+  describe('ignoreAndUntrack', () => {
+    const commitFiles = async (
+      repo: Repository,
+      files: Record<string, string>
+    ) => {
+      for (const [file, contents] of Object.entries(files)) {
+        await mkdir(Path.dirname(Path.join(repo.path, file)), {
+          recursive: true,
+        })
+        await writeFile(Path.join(repo.path, file), contents)
+      }
+      await exec(['add', '.'], repo.path)
+      const commit = await exec(['commit', '-m', 'add files'], repo.path)
+      assert.equal(commit.exitCode, 0)
+    }
+
+    const statusKinds = async (repo: Repository) => {
+      const status = await getStatusOrThrow(repo)
+      return new Map(
+        status.workingDirectory.files.map(f => [f.path, f.status.kind])
+      )
+    }
+
+    const ignoreRules = async (repo: Repository) =>
+      ((await readGitIgnoreAtRoot(repo)) ?? '')
+        .split(/\r?\n/)
+        .filter(line => line.length > 0)
+
+    const trackedFiles = async (repo: Repository) => {
+      const result = await exec(['ls-files'], repo.path)
+      return result.stdout.split('\n').filter(line => line.length > 0)
+    }
+
+    it('ignores a tracked file and untracks it, keeping it on disk', async t => {
+      const repo = await setupEmptyRepository(t)
+      await commitFiles(repo, { 'junk.json': '{}\n' })
+      await writeFile(Path.join(repo.path, 'junk.json'), '{"churn":1}\n')
+
+      await ignoreAndUntrack(repo, 'junk.json')
+
+      assert.deepEqual(await ignoreRules(repo), ['junk.json'])
+      const kinds = await statusKinds(repo)
+      assert.equal(kinds.get('junk.json'), AppFileStatusKind.Deleted)
+      assert(await pathExists(Path.join(repo.path, 'junk.json')))
+    })
+
+    it('untracks every file under a root-anchored folder', async t => {
+      const repo = await setupEmptyRepository(t)
+      await commitFiles(repo, {
+        'a/b/x.txt': 'x\n',
+        'a/b/y.txt': 'y\n',
+        'keep.txt': 'keep\n',
+      })
+
+      await ignoreAndUntrack(repo, '/a/b')
+
+      assert.deepEqual(await ignoreRules(repo), ['/a/b'])
+      const kinds = await statusKinds(repo)
+      assert.equal(kinds.get('a/b/x.txt'), AppFileStatusKind.Deleted)
+      assert.equal(kinds.get('a/b/y.txt'), AppFileStatusKind.Deleted)
+      assert.equal(kinds.has('keep.txt'), false)
+      assert.deepEqual(await trackedFiles(repo), ['keep.txt'])
+    })
+
+    it('does not fail on untracked paths in the list', async t => {
+      const repo = await setupEmptyRepository(t)
+      await commitFiles(repo, { 'tracked.txt': 'tracked\n' })
+      await writeFile(Path.join(repo.path, 'new.txt'), 'new\n')
+
+      await ignoreAndUntrack(repo, ['tracked.txt', 'new.txt'])
+
+      const kinds = await statusKinds(repo)
+      assert.equal(kinds.get('tracked.txt'), AppFileStatusKind.Deleted)
+      assert.equal(kinds.has('new.txt'), false)
+    })
+
+    it('matches paths literally, not as globs', async t => {
+      const repo = await setupEmptyRepository(t)
+      await commitFiles(repo, { 'foo[1].txt': 'a\n', 'foo1.txt': 'b\n' })
+
+      await ignoreAndUntrack(repo, 'foo[1].txt')
+
+      assert.deepEqual(await trackedFiles(repo), ['foo1.txt'])
+      const kinds = await statusKinds(repo)
+      assert.equal(kinds.get('foo[1].txt'), AppFileStatusKind.Deleted)
+      assert.equal(kinds.has('foo1.txt'), false)
+    })
+
+    it('keeps the file untracked and ignored once committed', async t => {
+      const repo = await setupEmptyRepository(t)
+      await commitFiles(repo, { 'junk.json': '{}\n' })
+
+      await ignoreAndUntrack(repo, 'junk.json')
+
+      const status = await getStatusOrThrow(repo)
+      await createCommit(
+        repo,
+        'Ignore junk.json',
+        status.workingDirectory.files
+      )
+
+      assert.deepEqual(await trackedFiles(repo), ['.gitignore'])
+      assert.equal((await statusKinds(repo)).size, 0)
+      const checkIgnore = await exec(['check-ignore', 'junk.json'], repo.path)
+      assert.equal(checkIgnore.exitCode, 0)
+      assert(await pathExists(Path.join(repo.path, 'junk.json')))
     })
   })
 })

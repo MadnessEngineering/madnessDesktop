@@ -21,7 +21,11 @@ import { getStatus } from '../../lib/git/status'
 import { getWorkingDirectoryDiff, getFilesDiffText } from '../../lib/git/diff'
 import { createCommit } from '../../lib/git/commit'
 import { getCommits } from '../../lib/git/log'
-import { appendIgnoreFile, appendIgnoreRule } from '../../lib/git/gitignore'
+import {
+  appendIgnoreFile,
+  appendIgnoreRule,
+  ignoreAndUntrack,
+} from '../../lib/git/gitignore'
 import { IMenuItem, showContextualMenu } from '../../lib/menu-item'
 import { revealInFileManager, shell as appShell } from '../../lib/app-shell'
 import {
@@ -747,6 +751,11 @@ export class SubmoduleDiff extends React.Component<
     const extension = Path.extname(path)
     const isSafeExtension = isSafeFileExtension(extension)
     const isGitIgnore = path.endsWith('.gitignore')
+    // Ignoring a file git already tracks has no effect until it's removed
+    // from the index, so tracked files also get an ignore-and-untrack item.
+    const isTracked =
+      file.status.kind !== AppFileStatusKind.Untracked &&
+      file.status.kind !== AppFileStatusKind.Conflicted
 
     const items: IMenuItem[] = [
       {
@@ -763,25 +772,46 @@ export class SubmoduleDiff extends React.Component<
       },
     ]
 
+    if (isTracked) {
+      items.push({
+        label: __DARWIN__
+          ? 'Ignore and Untrack File (Keep on Disk)'
+          : 'Ignore and untrack file (keep on disk)',
+        action: () => this.onIgnoreAndUntrackFile(path),
+        enabled: !isGitIgnore,
+      })
+    }
+
     const pathComponents = path.split('/').slice(0, -1)
     if (pathComponents.length > 0) {
-      const submenu = pathComponents.map((_, index) => {
-        const label = `/${pathComponents
-          .slice(0, pathComponents.length - index)
-          .join('/')}`
-        return {
-          label,
-          action: () => this.onIgnoreFile(label),
-        }
-      })
+      const folders = pathComponents.map(
+        (_, index) =>
+          `/${pathComponents.slice(0, pathComponents.length - index).join('/')}`
+      )
 
       items.push({
         label: __DARWIN__
           ? 'Ignore Folder (Add to .gitignore)'
           : 'Ignore folder (add to .gitignore)',
-        submenu,
+        submenu: folders.map(label => ({
+          label,
+          action: () => this.onIgnoreFile(label),
+        })),
         enabled: !isGitIgnore,
       })
+
+      if (isTracked) {
+        items.push({
+          label: __DARWIN__
+            ? 'Ignore and Untrack Folder (Keep on Disk)'
+            : 'Ignore and untrack folder (keep on disk)',
+          submenu: folders.map(label => ({
+            label,
+            action: () => this.onIgnoreAndUntrackFile(label),
+          })),
+          enabled: !isGitIgnore,
+        })
+      }
     }
 
     if (extension.length > 0) {
@@ -877,6 +907,15 @@ export class SubmoduleDiff extends React.Component<
 
   private onIgnorePattern = async (pattern: string) => {
     await appendIgnoreRule(this.getSubmoduleRepo(), pattern)
+    await this.loadSubmoduleStatus()
+  }
+
+  private onIgnoreAndUntrackFile = async (path: string) => {
+    try {
+      await ignoreAndUntrack(this.getSubmoduleRepo(), path)
+    } catch (error) {
+      log.error('Failed to ignore and untrack submodule file', error)
+    }
     await this.loadSubmoduleStatus()
   }
 

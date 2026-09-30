@@ -62,6 +62,23 @@ options menu next to the changes filter.
   Folder**, discarding the folder's changes, **Collapse** / **Expand**, and
   copying its full or relative path.
 
+### Ignoring a file that's already tracked
+
+Adding a file to `.gitignore` does nothing if git already tracks it. For a
+tracked file, the right-click menu also has **Ignore and Untrack File (Keep on
+Disk)** and **Ignore and Untrack Folder (Keep on Disk)**, plus **Ignore and
+Untrack N Selected Files** when several are selected. Each one adds the path
+to `.gitignore` and removes it from the index (`git rm --cached`), leaving the
+file where it is.
+
+The file then shows as deleted next to the `.gitignore` change. Commit both.
+When another clone pulls that commit, git deletes the file from that clone's
+disk.
+
+There is no "Ignore and untrack all *.ext files" item, because it would also
+untrack files like `package.json`. The same file and folder items appear in
+the submodule changes view.
+
 ### Markdown preview
 
 For a Markdown file, the book button in the diff header shows the file
