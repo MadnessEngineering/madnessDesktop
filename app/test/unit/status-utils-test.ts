@@ -4,7 +4,9 @@ import {
   mapStatus,
   isConflictedFile,
   hasConflictedFiles,
+  getBulkResolutionTargets,
 } from '../../src/lib/status'
+import { ManualConflictResolution } from '../../src/models/manual-conflict-resolution'
 import {
   AppFileStatusKind,
   WorkingDirectoryStatus,
@@ -126,6 +128,77 @@ describe('lib/status', () => {
       ]
       const wd = WorkingDirectoryStatus.fromFiles(files)
       assert.equal(hasConflictedFiles(wd), true)
+    })
+  })
+
+  describe('getBulkResolutionTargets', () => {
+    function makeConflict(
+      path: string,
+      us: GitStatusEntry,
+      them: GitStatusEntry,
+      conflictMarkerCount?: number
+    ): WorkingDirectoryFileChange {
+      const entry = {
+        kind: 'conflicted' as const,
+        action: 'x' as any,
+        us,
+        them,
+      }
+      const status =
+        conflictMarkerCount === undefined
+          ? { kind: AppFileStatusKind.Conflicted, entry }
+          : { kind: AppFileStatusKind.Conflicted, entry, conflictMarkerCount }
+      return new WorkingDirectoryFileChange(
+        path,
+        status as any,
+        DiffSelection.fromInitialSelection(DiffSelectionType.All)
+      )
+    }
+
+    const A = GitStatusEntry.Added
+    const U = GitStatusEntry.UpdatedButUnmerged
+    const D = GitStatusEntry.Deleted
+
+    it('targets only files that are still conflicted', () => {
+      const wd = WorkingDirectoryStatus.fromFiles([
+        makeConflict('markers.md', U, U, 3),
+        makeConflict('fixed-by-hand.md', U, U, 0),
+        makeConflict('added.md', A, A),
+        makeConflict('already-picked.md', A, A),
+        makeFile('clean.txt', AppFileStatusKind.Modified),
+      ])
+      const picked = new Map([
+        ['already-picked.md', ManualConflictResolution.theirs],
+      ])
+
+      const { paths } = getBulkResolutionTargets(
+        wd,
+        picked,
+        ManualConflictResolution.ours
+      )
+      assert.deepStrictEqual(paths, ['markers.md', 'added.md'])
+    })
+
+    it('counts the files that side would drop', () => {
+      const wd = WorkingDirectoryStatus.fromFiles([
+        makeConflict('gone-on-theirs.md', U, D),
+        makeConflict('gone-on-ours.md', D, U),
+        makeConflict('both.md', A, A),
+      ])
+      const none = new Map<string, ManualConflictResolution>()
+
+      assert.equal(
+        getBulkResolutionTargets(wd, none, ManualConflictResolution.ours)
+          .deletionCount,
+        1
+      )
+      const theirs = getBulkResolutionTargets(
+        wd,
+        none,
+        ManualConflictResolution.theirs
+      )
+      assert.equal(theirs.deletionCount, 1)
+      assert.equal(theirs.paths.length, 3)
     })
   })
 })

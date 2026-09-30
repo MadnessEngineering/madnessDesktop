@@ -2874,6 +2874,19 @@ export class Dispatcher {
     )
   }
 
+  /** Set (or clear, with `null`) the manual resolution for many paths at once */
+  public updateManualConflictResolutions(
+    repository: Repository,
+    paths: ReadonlyArray<string>,
+    manualResolution: ManualConflictResolution | null
+  ) {
+    return this.appStore._updateManualConflictResolutions(
+      repository,
+      paths,
+      manualResolution
+    )
+  }
+
   public async confirmOrForcePush(repository: Repository) {
     const { askForConfirmationOnForcePush } = this.appStore.getState()
 

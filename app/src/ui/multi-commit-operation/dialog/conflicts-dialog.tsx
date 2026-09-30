@@ -12,6 +12,7 @@ import {
   getResolvedFiles,
   getConflictedFiles,
   getUnmergedFiles,
+  getBulkResolutionTargets,
 } from '../../../lib/status'
 import {
   renderUnmergedFile,
@@ -72,6 +73,12 @@ interface IConflictsDialogState {
   readonly isCommitting: boolean
   readonly isAborting: boolean
   readonly isFileResolutionOptionsMenuOpen: boolean
+  /**
+   * Side picked at the top of the dialog; becomes each row's one-click
+   * button. Deliberately not persisted — ours/theirs swap meaning between
+   * merge and rebase, and a sticky wrong default is a footgun.
+   */
+  readonly defaultResolution: ManualConflictResolution | null
 }
 
 /**
@@ -92,6 +99,7 @@ export class ConflictsDialog extends React.Component<
       isCommitting: false,
       isAborting: false,
       isFileResolutionOptionsMenuOpen: false,
+      defaultResolution: null,
     }
   }
 
@@ -167,6 +175,145 @@ export class ConflictsDialog extends React.Component<
     this.setState({ isFileResolutionOptionsMenuOpen })
   }
 
+  private getSideName(resolution: ManualConflictResolution): string {
+    return resolution === ManualConflictResolution.ours
+      ? this.props.ourBranch ?? 'ours'
+      : this.props.theirBranch ?? 'theirs'
+  }
+
+  private toggleDefaultResolution(resolution: ManualConflictResolution) {
+    this.setState(state => ({
+      defaultResolution:
+        state.defaultResolution === resolution ? null : resolution,
+    }))
+  }
+
+  private onPickOurs = () =>
+    this.toggleDefaultResolution(ManualConflictResolution.ours)
+
+  private onPickTheirs = () =>
+    this.toggleDefaultResolution(ManualConflictResolution.theirs)
+
+  private onResolveAll = () => {
+    const resolution = this.state.defaultResolution
+    if (resolution === null) {
+      return
+    }
+    const { paths } = getBulkResolutionTargets(
+      this.props.workingDirectory,
+      this.props.manualResolutions,
+      resolution
+    )
+    this.props.dispatcher.updateManualConflictResolutions(
+      this.props.repository,
+      paths,
+      resolution
+    )
+  }
+
+  private renderSideButton(
+    side: ManualConflictResolution,
+    onClick: () => void
+  ) {
+    const selected = this.state.defaultResolution === side
+    const name = this.getSideName(side)
+    return (
+      <Button
+        className={
+          selected
+            ? 'small-button button-group-item selected'
+            : 'small-button button-group-item'
+        }
+        ariaPressed={selected}
+        onClick={onClick}
+        tooltip={`Make “Use ${name}” the one-click button on each file`}
+      >
+        {name}
+      </Button>
+    )
+  }
+
+  private onUndoAll = () => {
+    this.props.dispatcher.updateManualConflictResolutions(
+      this.props.repository,
+      [...this.props.manualResolutions.keys()],
+      null
+    )
+  }
+
+  /**
+   * Renders the "pick a side" bar above the file list: choosing a side makes
+   * it every row's one-click button, and "Use all" resolves every remaining
+   * conflict to it at once.
+   */
+  private renderBulkResolutionBar(conflictedFilesCount: number) {
+    const { defaultResolution } = this.state
+    const hasManualResolutions = this.props.manualResolutions.size > 0
+
+    if (conflictedFilesCount === 0 && !hasManualResolutions) {
+      return null
+    }
+
+    const target =
+      defaultResolution === null
+        ? null
+        : getBulkResolutionTargets(
+            this.props.workingDirectory,
+            this.props.manualResolutions,
+            defaultResolution
+          )
+
+    const sideName =
+      defaultResolution === null ? null : this.getSideName(defaultResolution)
+
+    let resolveAllTooltip: string
+    if (target === null) {
+      resolveAllTooltip = 'Pick a side first'
+    } else if (target.deletionCount > 0) {
+      const files = target.deletionCount === 1 ? 'file' : 'files'
+      resolveAllTooltip = `${target.deletionCount} ${files} will be dropped: deleted on ${sideName}`
+    } else {
+      resolveAllTooltip = `Resolve every remaining conflict using ${sideName}`
+    }
+
+    return (
+      <div className="bulk-resolution-bar">
+        <span className="bulk-resolution-label">Default side:</span>
+        <div className="bulk-resolution-sides" role="group">
+          {this.renderSideButton(
+            ManualConflictResolution.ours,
+            this.onPickOurs
+          )}
+          {this.renderSideButton(
+            ManualConflictResolution.theirs,
+            this.onPickTheirs
+          )}
+        </div>
+        {conflictedFilesCount > 0 && (
+          <Button
+            className="small-button"
+            disabled={target === null || target.paths.length === 0}
+            tooltip={resolveAllTooltip}
+            onClick={this.onResolveAll}
+          >
+            {target === null
+              ? `Use all ${conflictedFilesCount}`
+              : `Use all ${target.paths.length} from ${sideName}`}
+          </Button>
+        )}
+        {hasManualResolutions && (
+          <Button
+            className="small-button"
+            onClick={this.onUndoAll}
+            tooltip="Clear every side you've picked in this dialog"
+          >
+            Undo all
+          </Button>
+        )}
+      </div>
+    )
+  }
+
   /**
    *  Renders the list of conflicts in the dialog
    */
@@ -195,6 +342,7 @@ export class ConflictsDialog extends React.Component<
               setIsFileResolutionOptionsMenuOpen:
                 this.setIsFileResolutionOptionsMenuOpen,
               isFirstConflictedFile: isFirst,
+              defaultResolution: this.state.defaultResolution ?? undefined,
             })
           }
           return null
@@ -214,6 +362,7 @@ export class ConflictsDialog extends React.Component<
     return (
       <>
         {renderUnmergedFilesSummary(conflictedFilesCount)}
+        {this.renderBulkResolutionBar(conflictedFilesCount)}
         {this.renderUnmergedFiles(unmergedFiles)}
         {renderShellLink(this.openThisRepositoryInShell)}
       </>

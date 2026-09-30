@@ -171,3 +171,33 @@ export function getConflictedFiles(
       hasUnresolvedConflicts(f.status, manualResolutions.get(f.path))
   )
 }
+
+/**
+ * The files a "use all from <side>" action would resolve: only those still
+ * conflicted, so files the user already resolved (by hand or by picking a
+ * side) are left alone. `deletionCount` is how many of them are deleted on
+ * that side, i.e. how many files the action would drop from the result.
+ */
+export function getBulkResolutionTargets(
+  status: WorkingDirectoryStatus,
+  manualResolutions: Map<string, ManualConflictResolution>,
+  resolution: ManualConflictResolution
+): { readonly paths: ReadonlyArray<string>; readonly deletionCount: number } {
+  const paths = new Array<string>()
+  let deletionCount = 0
+
+  for (const file of getConflictedFiles(status, manualResolutions)) {
+    if (!isConflictedFileStatus(file.status)) {
+      continue
+    }
+    paths.push(file.path)
+    const { entry } = file.status
+    const side =
+      resolution === ManualConflictResolution.ours ? entry.us : entry.them
+    if (side === GitStatusEntry.Deleted) {
+      deletionCount++
+    }
+  }
+
+  return { paths, deletionCount }
+}

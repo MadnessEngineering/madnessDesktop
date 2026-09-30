@@ -9938,6 +9938,19 @@ export class AppStore extends TypedBaseStore<IAppState> {
     path: string,
     manualResolution: ManualConflictResolution | null
   ) {
+    this._updateManualConflictResolutions(repository, [path], manualResolution)
+  }
+
+  /**
+   * Set (or clear, with `null`) the manual resolution for many paths at once,
+   * with a single state update — resolving hundreds of files one emit at a
+   * time makes the conflicts dialog crawl.
+   */
+  public _updateManualConflictResolutions(
+    repository: Repository,
+    paths: ReadonlyArray<string>,
+    manualResolution: ManualConflictResolution | null
+  ) {
     this.repositoryStateCache.updateChangesState(repository, state => {
       const { conflictState } = state
 
@@ -9948,10 +9961,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
       const updatedManualResolutions = new Map(conflictState.manualResolutions)
 
-      if (manualResolution !== null) {
-        updatedManualResolutions.set(path, manualResolution)
-      } else {
-        updatedManualResolutions.delete(path)
+      for (const path of paths) {
+        if (manualResolution !== null) {
+          updatedManualResolutions.set(path, manualResolution)
+        } else {
+          updatedManualResolutions.delete(path)
+        }
       }
 
       return {

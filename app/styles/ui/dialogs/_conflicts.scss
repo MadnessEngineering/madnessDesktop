@@ -15,6 +15,43 @@ dialog#conflicts-dialog {
     padding-bottom: var(--spacing);
   }
 
+  .bulk-resolution-bar {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    gap: var(--spacing-half);
+    margin-bottom: var(--spacing-double);
+
+    .bulk-resolution-label {
+      color: var(--text-secondary-color);
+    }
+
+    .bulk-resolution-sides {
+      display: flex;
+      min-width: 0;
+
+      .button-component {
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .selected {
+        background-color: var(--button-background);
+        border-color: var(--button-background);
+        color: var(--button-text-color);
+      }
+    }
+  }
+
+  .default-resolution-button {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .green-circle {
     background-color: var(--color-new);
     color: var(--background-color);
