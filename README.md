@@ -4,7 +4,7 @@ A [GitHub Desktop](https://github.com/desktop/desktop) fork wired into the **mad
 
 > **Early build.** Currently `v0.1.0` — an **unsigned macOS build for Apple Silicon (arm64)**. No Intel, Windows, or Linux release yet. The source still builds for other platforms (it's a Desktop fork), but the only thing we ship today is the arm64 macOS zip.
 
-![Madness Desktop's exploded view: the repository drawn as an isometric assembly of lettered parts, with its submodule as a dashed crate](docs/assets/exploded-view.png)
+![Madness Desktop's exploded view: the repository drawn as an isometric assembly of lettered parts, its submodule a dashed crate, with History paint marking the busiest parts in amber](docs/assets/exploded-view.png)
 
 ## Where can I get it?
 
@@ -29,7 +29,7 @@ Everything GitHub Desktop does, plus workshop coordination:
 - **[Hook Loadouts](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/hook-loadouts.md)** — install and toggle bundles of git-hook scripts per repository from the UI. A thin `.d/` dispatcher lets multiple scripts stack on the same hook without clobbering each other, and recent hook runs show up in a log in the Changes sidebar. Presets: `mad-standard`, `deploy-enabled`, `desktop-dev`, `minimal`.
 - **[MQTT integration](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/mqtt-integration.md)** — publish commit context and events to a shared broker. Every machine on the network sees real-time git activity from every other machine.
 - **[Omnispindle todos](https://github.com/MadnessEngineering/madnessDesktop/blob/HEAD/docs/ecosystem.md)** — a live todo list from the Omnispindle MCP server in the Changes sidebar, plus a `todo-prefix` hook that stamps the active todo ID into your commit message.
-- **Exploded view** — when a repository has no local changes, flip the page to an instruction-manual drawing of it: every folder a lettered part sized by weight, submodules as dashed crates, tool dot-folders set aside, and a materials list underneath. Step into a folder to take it apart too, or into a submodule to switch the app to it — and back out again from the breadcrumb.
+- **Exploded view** — when a repository has no local changes, flip the page to an instruction-manual drawing of it: every folder a lettered part sized by weight, submodules as dashed crates, tool dot-folders set aside, and a materials list underneath. Step into a folder to take it apart too, or into a submodule to switch the app to it — and back out again from the breadcrumb. **Paint** marks where the work is, one amber side per part: your uncommitted changes (also reachable from the diff header while you have them), the last 100 commits' history, or submodules drifting off their pins.
 - **Subrepo tooling** — submodules nest under their monorepo as collapsible folders, un-added submodules appear as "ghost" rows with one-click **Add**, submodule commit history shows up in diffs, and push/pull steps through each submodule before the parent.
 
   ![A submodule pointer change in the parent repository, listing the commits it brings in, with Sync and Rollback](docs/assets/submodule-changes.png)
