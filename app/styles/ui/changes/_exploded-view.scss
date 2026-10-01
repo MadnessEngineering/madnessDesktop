@@ -2,6 +2,12 @@
 // sheet: blueprint grid, lettered part callouts, dashed assembly lines.
 
 .changes-interstitial {
+  // The exploded view measures the pane, not the window, so the sidebar's
+  // width and the zoom level both decide when it goes side by side.
+  &:has(> .content.exploded) {
+    container: exploded-pane / inline-size;
+  }
+
   .content.exploded {
     max-width: 960px;
 
@@ -9,6 +15,11 @@
     > .no-changes-view-toggle {
       margin-top: 0;
       margin-bottom: var(--spacing-double);
+    }
+
+    // Side by side, the sheet needs more than the stacked width.
+    @container exploded-pane (min-width: 1100px) {
+      max-width: 1600px;
     }
   }
 
@@ -302,6 +313,24 @@
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
     // Rows get extra room for the stagger below plus the callout circles.
     gap: calc(var(--spacing) * 4) var(--spacing-double);
+  }
+
+  // Side by side once the pane fits a legible drawing next to two columns of
+  // cards.
+  @container exploded-pane (min-width: 1100px) {
+    .exploded-stage {
+      display: grid;
+      grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+      align-items: start;
+      column-gap: var(--spacing-double);
+    }
+
+    // The drawing stays in view while a long list of cards scrolls past it.
+    .exploded-drawing {
+      position: sticky;
+      top: var(--spacing);
+      margin-bottom: 0;
+    }
   }
 
   .exploded-part {

@@ -858,37 +858,40 @@ export class ExplodedView extends React.Component<
             <span>{summary}</span>
           </div>
           {this.renderPaintSwitch(tally)}
-          <ExplodedDrawing
-            parts={this.drawingParts(parts, tally)}
-            highlightedPath={hoveredPath}
-            uninitializedPaths={this.uninitializedPaths(submodules)}
-            paint={paintByPath}
-            onHover={this.onHover}
-            onActivate={this.onActivatePath}
-          />
-          {parts.length > 0 && (
-            <ol className="exploded-assembly">
-              {parts.map((part, i) => (
-                <PartCard
-                  key={part.path}
-                  part={part}
-                  label={partLabel(i)}
-                  submodule={submodules.get(part.path)}
-                  busy={busyPath === part.path}
-                  highlighted={hoveredPath === part.path}
-                  paint={paintByPath.get(part.path) ?? 0}
-                  paintNote={paintNote(
-                    this.state.paintMode,
-                    part,
-                    tally.get(part.path) ?? 0,
-                    reasons
-                  )}
-                  onActivate={this.onActivatePart}
-                  onHover={this.onHover}
-                />
-              ))}
-            </ol>
-          )}
+          {/* Drawing above the cards, or beside them when there's room. */}
+          <div className="exploded-stage">
+            <ExplodedDrawing
+              parts={this.drawingParts(parts, tally)}
+              highlightedPath={hoveredPath}
+              uninitializedPaths={this.uninitializedPaths(submodules)}
+              paint={paintByPath}
+              onHover={this.onHover}
+              onActivate={this.onActivatePath}
+            />
+            {parts.length > 0 && (
+              <ol className="exploded-assembly">
+                {parts.map((part, i) => (
+                  <PartCard
+                    key={part.path}
+                    part={part}
+                    label={partLabel(i)}
+                    submodule={submodules.get(part.path)}
+                    busy={busyPath === part.path}
+                    highlighted={hoveredPath === part.path}
+                    paint={paintByPath.get(part.path) ?? 0}
+                    paintNote={paintNote(
+                      this.state.paintMode,
+                      part,
+                      tally.get(part.path) ?? 0,
+                      reasons
+                    )}
+                    onActivate={this.onActivatePart}
+                    onHover={this.onHover}
+                  />
+                ))}
+              </ol>
+            )}
+          </div>
           {this.renderShopConfig(shopConfig)}
           {this.renderHardware(files, tally)}
         </div>
