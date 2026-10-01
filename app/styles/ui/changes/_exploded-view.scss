@@ -315,21 +315,51 @@
     gap: calc(var(--spacing) * 4) var(--spacing-double);
   }
 
-  // Side by side once the pane fits a legible drawing next to two columns of
-  // cards.
+  // Wide: the materials list moves up beside the drawing it labels, like the
+  // parts list printed next to a manual's illustration, and the cards get the
+  // full width below. Rows with nothing in them collapse, so no row gap.
   @container exploded-pane (min-width: 1100px) {
-    .exploded-stage {
+    .exploded-sheet:has(> .exploded-drawing):has(> .exploded-materials) {
       display: grid;
-      grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+      grid-template-columns: minmax(0, 1fr) clamp(280px, 32%, 460px);
+      grid-template-areas:
+        'title title'
+        'paint paint'
+        'drawing materials'
+        'cards cards'
+        'shop shop'
+        'hardware hardware';
       align-items: start;
-      column-gap: var(--spacing-double);
-    }
+      column-gap: calc(var(--spacing) * 3);
 
-    // The drawing stays in view while a long list of cards scrolls past it.
-    .exploded-drawing {
-      position: sticky;
-      top: var(--spacing);
-      margin-bottom: 0;
+      > .exploded-title {
+        grid-area: title;
+      }
+      > .exploded-paint {
+        grid-area: paint;
+      }
+      > .exploded-assembly {
+        grid-area: cards;
+      }
+      > .exploded-shop {
+        grid-area: shop;
+      }
+      > .exploded-hardware {
+        grid-area: hardware;
+      }
+
+      // A long materials list makes the row taller than the drawing; the
+      // drawing keeps pace with it as it scrolls.
+      > .exploded-drawing {
+        grid-area: drawing;
+        position: sticky;
+        top: var(--spacing);
+      }
+
+      > .exploded-materials {
+        grid-area: materials;
+        margin: 0 0 var(--spacing-double);
+      }
     }
   }
 
@@ -598,6 +628,7 @@
 
   .exploded-materials {
     width: 100%;
+    margin-top: var(--spacing-double);
     border-collapse: collapse;
     font-size: var(--font-size-sm);
 

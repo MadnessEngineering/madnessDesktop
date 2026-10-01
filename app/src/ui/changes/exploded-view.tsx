@@ -850,53 +850,50 @@ export class ExplodedView extends React.Component<
       .filter(s => s !== null)
       .join(' · ')
 
+    // The materials list is last so a narrow sheet reads top to bottom; a
+    // wide one moves it up beside the drawing it labels.
     return (
-      <>
-        <div className="exploded-sheet">
-          <div className="exploded-title">
-            <h2>Exploded view</h2>
-            <span>{summary}</span>
-          </div>
-          {this.renderPaintSwitch(tally)}
-          {/* Drawing above the cards, or beside them when there's room. */}
-          <div className="exploded-stage">
-            <ExplodedDrawing
-              parts={this.drawingParts(parts, tally)}
-              highlightedPath={hoveredPath}
-              uninitializedPaths={this.uninitializedPaths(submodules)}
-              paint={paintByPath}
-              onHover={this.onHover}
-              onActivate={this.onActivatePath}
-            />
-            {parts.length > 0 && (
-              <ol className="exploded-assembly">
-                {parts.map((part, i) => (
-                  <PartCard
-                    key={part.path}
-                    part={part}
-                    label={partLabel(i)}
-                    submodule={submodules.get(part.path)}
-                    busy={busyPath === part.path}
-                    highlighted={hoveredPath === part.path}
-                    paint={paintByPath.get(part.path) ?? 0}
-                    paintNote={paintNote(
-                      this.state.paintMode,
-                      part,
-                      tally.get(part.path) ?? 0,
-                      reasons
-                    )}
-                    onActivate={this.onActivatePart}
-                    onHover={this.onHover}
-                  />
-                ))}
-              </ol>
-            )}
-          </div>
-          {this.renderShopConfig(shopConfig)}
-          {this.renderHardware(files, tally)}
+      <div className="exploded-sheet">
+        <div className="exploded-title">
+          <h2>Exploded view</h2>
+          <span>{summary}</span>
         </div>
+        {this.renderPaintSwitch(tally)}
+        <ExplodedDrawing
+          parts={this.drawingParts(parts, tally)}
+          highlightedPath={hoveredPath}
+          uninitializedPaths={this.uninitializedPaths(submodules)}
+          paint={paintByPath}
+          onHover={this.onHover}
+          onActivate={this.onActivatePath}
+        />
+        {parts.length > 0 && (
+          <ol className="exploded-assembly">
+            {parts.map((part, i) => (
+              <PartCard
+                key={part.path}
+                part={part}
+                label={partLabel(i)}
+                submodule={submodules.get(part.path)}
+                busy={busyPath === part.path}
+                highlighted={hoveredPath === part.path}
+                paint={paintByPath.get(part.path) ?? 0}
+                paintNote={paintNote(
+                  this.state.paintMode,
+                  part,
+                  tally.get(part.path) ?? 0,
+                  reasons
+                )}
+                onActivate={this.onActivatePart}
+                onHover={this.onHover}
+              />
+            ))}
+          </ol>
+        )}
+        {this.renderShopConfig(shopConfig)}
+        {this.renderHardware(files, tally)}
         {this.renderMaterials(parts, shopConfig, files)}
-      </>
+      </div>
     )
   }
 
