@@ -259,6 +259,45 @@ describe('gitignore', () => {
     })
   })
 
+  describe('appendIgnoreFile', () => {
+    it('ignores an untracked file a deeper .gitignore re-includes', async t => {
+      const repo = await setupEmptyRepository(t)
+      await mkdir(Path.join(repo.path, 'a/b'), { recursive: true })
+      await writeFile(Path.join(repo.path, 'a/.gitignore'), '!b/**\n')
+      await writeFile(Path.join(repo.path, 'a/b/.gitignore'), '!c.txt\n')
+      await writeFile(Path.join(repo.path, 'a/b/c.txt'), 'c\n')
+
+      await appendIgnoreFile(repo, 'a/b/c.txt')
+
+      const deepest = await readFile(Path.join(repo.path, 'a/b/.gitignore'))
+      assert.equal(
+        deepest.toString('utf8').replace(/\r\n/g, '\n'),
+        '!c.txt\n/c.txt\n'
+      )
+      const status = await getStatusOrThrow(repo)
+      assert.deepEqual(status.workingDirectory.files.map(f => f.path).sort(), [
+        '.gitignore',
+        'a/.gitignore',
+        'a/b/.gitignore',
+      ])
+    })
+
+    it('leaves deeper .gitignore files alone when not needed', async t => {
+      const repo = await setupEmptyRepository(t)
+      await mkdir(Path.join(repo.path, 'a'), { recursive: true })
+      await writeFile(Path.join(repo.path, 'a/.gitignore'), 'other.txt\n')
+      await writeFile(Path.join(repo.path, 'a/c.txt'), 'c\n')
+
+      await appendIgnoreFile(repo, 'a/c.txt')
+
+      const nested = await readFile(Path.join(repo.path, 'a/.gitignore'))
+      assert.equal(
+        nested.toString('utf8').replace(/\r\n/g, '\n'),
+        'other.txt\n'
+      )
+    })
+  })
+
   describe('ignoreAndUntrack', () => {
     const commitFiles = async (
       repo: Repository,
@@ -345,6 +384,36 @@ describe('gitignore', () => {
       const kinds = await statusKinds(repo)
       assert.equal(kinds.get('foo[1].txt'), AppFileStatusKind.Deleted)
       assert.equal(kinds.has('foo1.txt'), false)
+    })
+
+    it('outranks a deeper .gitignore that re-includes the file', async t => {
+      const repo = await setupEmptyRepository(t)
+      await commitFiles(repo, {
+        'sub/.gitignore': '!skills/**\n',
+        'sub/skills/manifest.json': '{}\n',
+        'sub/skills/keep.md': 'keep\n',
+      })
+
+      await ignoreAndUntrack(repo, 'sub/skills/manifest.json')
+
+      assert.deepEqual(await ignoreRules(repo), ['sub/skills/manifest.json'])
+      const nested = await readFile(Path.join(repo.path, 'sub/.gitignore'))
+      assert.equal(
+        nested.toString('utf8').replace(/\r\n/g, '\n'),
+        '!skills/**\n/skills/manifest.json\n'
+      )
+
+      const kinds = await statusKinds(repo)
+      assert.equal(
+        kinds.get('sub/skills/manifest.json'),
+        AppFileStatusKind.Deleted
+      )
+      assert.equal(kinds.has('sub/skills/keep.md'), false)
+      const checkIgnore = await exec(
+        ['check-ignore', '--no-index', 'sub/skills/manifest.json'],
+        repo.path
+      )
+      assert.equal(checkIgnore.exitCode, 0)
     })
 
     it('keeps the file untracked and ignored once committed', async t => {

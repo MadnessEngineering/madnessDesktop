@@ -901,7 +901,11 @@ export class SubmoduleDiff extends React.Component<
   }
 
   private onIgnoreFile = async (path: string) => {
-    await appendIgnoreFile(this.getSubmoduleRepo(), path)
+    try {
+      await appendIgnoreFile(this.getSubmoduleRepo(), path)
+    } catch (error) {
+      log.error('Failed to ignore submodule file', error)
+    }
     await this.loadSubmoduleStatus()
   }
 
