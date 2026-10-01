@@ -84,8 +84,9 @@ two MQTT topics with `mosquitto_pub`:
   `MADNESS_GIT_CONTEXT_TOPIC`)
 - `status/<device>/claude/git/events` (override with `MADNESS_GIT_EVENT_TOPIC`)
 
-The broker is `MADNESS_MQTT_HOST` (default `localhost`); `<device>` is `$DeNa`
-(default `macbook`). The active todo comes from
+The broker is `MADNESS_MQTT_HOST` (default `localhost`) on `MADNESS_MQTT_PORT`
+(default `1883`), with the login from Settings → MQTT if you set one;
+`<device>` is `$DeNa` (default `macbook`). The active todo comes from
 `.git/claude-session-context.json` if present.
 
 ### `todo-prefix` — prepare-commit-msg
