@@ -132,6 +132,18 @@ interface IFetchAllOptions<T> {
 const ClientID = process.env.TEST_ENV ? '' : __OAUTH_CLIENT_ID__
 const ClientSecret = process.env.TEST_ENV ? '' : __OAUTH_SECRET__
 
+/**
+ * Where GitHub sends the browser back to. The Madness Desktop OAuth app
+ * registers both callbacks, so this has to be sent explicitly or GitHub picks
+ * the first one and a dev build never gets its code. The protocol matches the
+ * one the app registers for itself (see `possibleProtocols` in main.ts).
+ */
+const OAuthRedirectURI = `${
+  process.env.TEST_ENV || __DEV_SECRETS__
+    ? 'x-madness-desktop-dev-auth'
+    : 'x-madness-desktop-auth'
+}://oauth`
+
 if (!ClientID || !ClientID.length || !ClientSecret || !ClientSecret.length) {
   log.warn(
     `DESKTOP_OAUTH_CLIENT_ID and/or DESKTOP_OAUTH_CLIENT_SECRET is undefined. You won't be able to authenticate new users.`
@@ -2361,8 +2373,10 @@ export function getOAuthAuthorizationURL(
   const urlBase = getHTMLURL(endpoint)
   const scope = encodeURIComponent(oauthScopes.join(' '))
 
+  const redirectUri = encodeURIComponent(OAuthRedirectURI)
+
   return new window.URL(
-    `/login/oauth/authorize?client_id=${ClientID}&scope=${scope}&state=${state}`,
+    `/login/oauth/authorize?client_id=${ClientID}&redirect_uri=${redirectUri}&scope=${scope}&state=${state}`,
     urlBase
   ).toString()
 }
@@ -2382,6 +2396,7 @@ export async function requestOAuthToken(
         client_id: ClientID,
         client_secret: ClientSecret,
         code: code,
+        redirect_uri: OAuthRedirectURI,
       }
     )
     tryUpdateEndpointVersionFromResponse(endpoint, response)
