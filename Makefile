@@ -1,6 +1,11 @@
-.PHONY: all dev prod install install-app cli kill-app
+.PHONY: all dev prod install install-app cli kill-app ready-publish
 
 all: dev
+
+# Read-only preflight for a release: git state, sign-in config, tools, the
+# Homebrew tap. Builds and publishes nothing. See script/ready-publish.sh.
+ready-publish:
+	@bash script/ready-publish.sh
 
 dev:
 	yarn build:dev
