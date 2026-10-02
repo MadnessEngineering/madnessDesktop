@@ -21,7 +21,8 @@ export function getReplacements() {
       process.env.DESKTOP_OAUTH_CLIENT_SECRET || devClientSecret
     ),
     __AUTH0_CLIENT_ID__: s(
-      process.env.AUTH0_CLIENT_ID || 'eROCLR8uZtNn1AUvA2WdFc7YZ3wJBVuX'
+      process.env.MADNESS_DESKTOP_AUTH0_CLIENT_ID ||
+        'eROCLR8uZtNn1AUvA2WdFc7YZ3wJBVuX'
     ),
     __AUTH0_DOMAIN__: s(
       process.env.AUTH0_DOMAIN || 'dev-eoi0koiaujjbib20.us.auth0.com'
