@@ -8,6 +8,11 @@ repository.
 - **Toggle it:** **Ctrl+\`**, or **Repository → Toggle Integrated Terminal**.
 - **Tabs:** **+** opens another shell; **claude ✦** opens a tab running
   `claude`. Each tab starts in the repository's folder.
+- **From the exploded view:** right-click a loose file and choose **Open in
+  Terminal (vim)** to open the panel with a new tab, named after the file,
+  running `command vim` on it. `command` skips any `vim` alias or function in
+  your dotfiles. The item is greyed out for a file whose name contains
+  control characters, since the command is typed into the shell.
 - **It keeps going:** each repository gets its own set of terminals, and they
   survive switching to another repository and back, or hiding the panel.
   Removing a repository from the app closes its terminals.

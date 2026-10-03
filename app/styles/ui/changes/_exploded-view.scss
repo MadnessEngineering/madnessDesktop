@@ -597,15 +597,39 @@
     }
 
     li {
+      min-width: 0;
+      font-size: var(--font-size-sm);
+    }
+
+    // Click opens the file in the editor; right-click for the rest.
+    .exploded-hardware-file {
       display: flex;
       align-items: center;
       gap: var(--spacing-third);
+      width: 100%;
       min-width: 0;
-      font-size: var(--font-size-sm);
+      padding: 0;
+      border: none;
+      border-radius: var(--border-radius);
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
 
       .octicon {
         flex-shrink: 0;
         color: var(--text-secondary-color);
+      }
+
+      &:hover .exploded-hardware-name {
+        color: var(--link-button-color);
+        text-decoration: underline;
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--focus-color-alpha);
       }
     }
 

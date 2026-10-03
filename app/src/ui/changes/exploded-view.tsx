@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { join } from 'path'
+import { extname, join, normalize } from 'path'
+import { clipboard } from 'electron'
 import classNames from 'classnames'
 import memoizeOne from 'memoize-one'
 
@@ -33,6 +34,17 @@ import * as octicons from '../octicons/octicons.generated'
 import { formatBytes } from '../lib/bytes'
 import { formatNumber } from '../../lib/format-number'
 import { ExplodedDrawing } from './exploded-drawing'
+import { IMenuItem, showContextualMenu } from '../../lib/menu-item'
+import { revealInFileManager, shell as appShell } from '../../lib/app-shell'
+import {
+  CopyFilePathLabel,
+  CopyRelativeFilePathLabel,
+  DefaultEditorLabel,
+  OpenWithDefaultProgramLabel,
+  RevealInFileManagerLabel,
+  isSafeFileExtension,
+} from '../lib/context-menu'
+import { vimCommand } from '../terminal-command'
 
 /** Loose files listed in the hardware box before it folds into "+N more". */
 const MaxHardwareShown = 24
@@ -318,6 +330,42 @@ class ShopConfigChip extends React.Component<IShopConfigChipProps> {
           <span className="exploded-shop-chip-name">{part.name}</span>
           <span className="exploded-shop-chip-meta">
             {formatNumber(part.fileCount)}
+          </span>
+        </button>
+      </li>
+    )
+  }
+}
+
+interface IHardwareFileProps {
+  readonly file: IRepositoryPart
+  readonly painted: boolean
+  readonly onOpen: (file: IRepositoryPart) => void
+  readonly onContextMenu: (file: IRepositoryPart) => void
+}
+
+/** A loose file: click to open it in the editor, right-click for the rest. */
+class HardwareFile extends React.Component<IHardwareFileProps> {
+  private onClick = () => this.props.onOpen(this.props.file)
+
+  private onContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault()
+    this.props.onContextMenu(this.props.file)
+  }
+
+  public render() {
+    const { file, painted } = this.props
+    return (
+      <li className={classNames({ painted })} title={file.path}>
+        <button
+          className="exploded-hardware-file"
+          onClick={this.onClick}
+          onContextMenu={this.onContextMenu}
+        >
+          <Octicon symbol={octicons.file} />
+          <span className="exploded-hardware-name">{file.name}</span>
+          <span className="exploded-hardware-size">
+            {formatBytes(file.byteSize)}
           </span>
         </button>
       </li>
@@ -628,6 +676,57 @@ export class ExplodedView extends React.Component<
     )
   }
 
+  private fullPath(file: IRepositoryPart) {
+    return join(this.props.repository.path, file.path)
+  }
+
+  private onOpenFile = (file: IRepositoryPart) => {
+    this.props.dispatcher.openInExternalEditor(this.fullPath(file))
+  }
+
+  private onFileContextMenu = (file: IRepositoryPart) => {
+    const { repository, dispatcher } = this.props
+    const fullPath = this.fullPath(file)
+    // Null when the path has characters that can't be typed into a shell.
+    const vim = vimCommand(fullPath)
+
+    const items: IMenuItem[] = [
+      {
+        label: DefaultEditorLabel,
+        action: () => dispatcher.openInExternalEditor(fullPath),
+      },
+      {
+        label: OpenWithDefaultProgramLabel,
+        action: () => appShell.openPath(fullPath),
+        enabled: isSafeFileExtension(extname(file.path)),
+      },
+      {
+        label: __DARWIN__ ? 'Open in Terminal (vim)' : 'Open in terminal (vim)',
+        action: () => {
+          if (vim !== null) {
+            dispatcher.runInTerminal(repository, vim, `vim ${file.name}`)
+          }
+        },
+        enabled: vim !== null,
+      },
+      { type: 'separator' },
+      {
+        label: RevealInFileManagerLabel,
+        action: () => revealInFileManager(repository, file.path),
+      },
+      {
+        label: CopyFilePathLabel,
+        action: () => clipboard.writeText(fullPath),
+      },
+      {
+        label: CopyRelativeFilePathLabel,
+        action: () => clipboard.writeText(normalize(file.path)),
+      },
+    ]
+
+    showContextualMenu(items)
+  }
+
   private renderHardware(
     files: ReadonlyArray<IRepositoryPart>,
     tally: ReadonlyMap<string, number>
@@ -646,17 +745,13 @@ export class ExplodedView extends React.Component<
         </h3>
         <ul>
           {shown.map(f => (
-            <li
+            <HardwareFile
               key={f.path}
-              title={f.path}
-              className={classNames({ painted: tally.has(f.path) })}
-            >
-              <Octicon symbol={octicons.file} />
-              <span className="exploded-hardware-name">{f.name}</span>
-              <span className="exploded-hardware-size">
-                {formatBytes(f.byteSize)}
-              </span>
-            </li>
+              file={f}
+              painted={tally.has(f.path)}
+              onOpen={this.onOpenFile}
+              onContextMenu={this.onFileContextMenu}
+            />
           ))}
           {hidden > 0 && (
             <li className="exploded-hardware-more">
