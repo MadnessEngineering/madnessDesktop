@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { ShellView } from './shell-view'
+import { ITerminalCommandRequest } from './terminal-command'
 
 interface ITerminalTab {
   readonly id: string
@@ -13,6 +14,8 @@ interface ITerminalTabsProps {
   readonly fontSize?: number
   readonly cursorBlink?: boolean
   readonly scrollback?: number
+  /** A request to run a command in a new tab, if one is meant for us. */
+  readonly commandRequest?: ITerminalCommandRequest | null
 }
 
 interface ITerminalTabsState {
@@ -21,6 +24,13 @@ interface ITerminalTabsState {
 }
 
 let nextTabId = 1
+
+/**
+ * The newest command request any tab set has run. Request ids only grow, so
+ * a request is run once even if it is rendered again, or reaches a tab set
+ * that mounts later for the same repository.
+ */
+let lastRunCommandRequestId = 0
 
 function makeTabId(): string {
   return `tab-${nextTabId++}`
@@ -44,10 +54,30 @@ export class TerminalTabs extends React.Component<
     }
   }
 
-  private addTab = (initialCommand?: string) => {
+  public componentDidMount() {
+    this.runCommandRequest()
+  }
+
+  public componentDidUpdate(prevProps: ITerminalTabsProps) {
+    if (prevProps.commandRequest !== this.props.commandRequest) {
+      this.runCommandRequest()
+    }
+  }
+
+  private runCommandRequest() {
+    const request = this.props.commandRequest
+    if (!request || request.id <= lastRunCommandRequestId) {
+      return
+    }
+    lastRunCommandRequestId = request.id
+    this.addTab(request.command, request.label)
+  }
+
+  private addTab = (initialCommand?: string, tabLabel?: string) => {
     const id = makeTabId()
     const label =
-      initialCommand === 'claude' ? 'claude ✦' : cwdBasename(this.props.cwd)
+      tabLabel ??
+      (initialCommand === 'claude' ? 'claude ✦' : cwdBasename(this.props.cwd))
     const tab: ITerminalTab = {
       id,
       label,
@@ -81,9 +111,7 @@ export class TerminalTabs extends React.Component<
       }
 
       const activeTabId =
-        s.activeTabId === tabId
-          ? tabs[Math.max(0, idx - 1)].id
-          : s.activeTabId
+        s.activeTabId === tabId ? tabs[Math.max(0, idx - 1)].id : s.activeTabId
 
       return { tabs, activeTabId }
     })
@@ -99,7 +127,9 @@ export class TerminalTabs extends React.Component<
           {tabs.map(tab => (
             <div
               key={tab.id}
-              className={`terminal-tabs-tab${tab.id === activeTabId ? ' is-active' : ''}`}
+              className={`terminal-tabs-tab${
+                tab.id === activeTabId ? ' is-active' : ''
+              }`}
               onClick={() => this.setState({ activeTabId: tab.id })}
             >
               <span className="terminal-tabs-tab-label">{tab.label}</span>

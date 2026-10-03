@@ -501,6 +501,8 @@ import {
   renameRemotePolicy,
   setRemotePolicy,
 } from '../git/remote-policy'
+import { Disposable } from 'event-kit'
+import { ITerminalCommandRequest, isTypeable } from '../../ui/terminal-command'
 
 const LastSelectedRepositoryIDKey = 'last-selected-repository-id'
 
@@ -800,6 +802,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private terminalFontSize: number = 12
   private terminalCursorBlink: boolean = true
   private terminalScrollback: number = 5000
+  /** Numbers each request to run a command in a new terminal tab. */
+  private terminalCommandRequestId = 0
 
   /** Which step the user needs to complete next in the onboarding tutorial */
   private currentOnboardingTutorialStep = TutorialStep.NotApplicable
@@ -8696,6 +8700,44 @@ export class AppStore extends TypedBaseStore<IAppState> {
     await getGlobalConfigPath()
       .then(p => this._openInExternalEditor(p))
       .catch(e => log.error('Could not open global Git config for editing', e))
+  }
+
+  /**
+   * Register a function to be called when part of the app asks to run a
+   * command in a new integrated terminal tab.
+   */
+  public onTerminalCommandRequested(
+    fn: (request: ITerminalCommandRequest) => void
+  ): Disposable {
+    return this.emitter.on('terminal-command-requested', fn)
+  }
+
+  /**
+   * Open the integrated terminal for the repository and run the command in a
+   * new tab. The command is typed into the shell, so it must not contain
+   * control characters.
+   */
+  public _runInTerminal(
+    repository: Repository,
+    command: string,
+    label: string
+  ): void {
+    if (!isTypeable(command)) {
+      this.emitError(
+        new Error(
+          'That command contains control characters, so it was not sent to the terminal.'
+        )
+      )
+      return
+    }
+
+    const request: ITerminalCommandRequest = {
+      id: ++this.terminalCommandRequestId,
+      repoPath: repository.path,
+      command,
+      label,
+    }
+    this.emitter.emit('terminal-command-requested', request)
   }
 
   /** Open a path to a repository or file using the user's configured editor */

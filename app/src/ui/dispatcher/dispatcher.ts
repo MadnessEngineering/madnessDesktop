@@ -1742,6 +1742,18 @@ export class Dispatcher {
   }
 
   /**
+   * Open the integrated terminal for the repository and run the command in a
+   * new tab with the given label.
+   */
+  public runInTerminal(
+    repository: Repository,
+    command: string,
+    label: string
+  ): void {
+    this.appStore._runInTerminal(repository, command, label)
+  }
+
+  /**
    * Opens a path in a selected external editor without changing preferences.
    */
   public async openInSelectedExternalEditor(

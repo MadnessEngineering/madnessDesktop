@@ -7,6 +7,7 @@ import * as octicons from './octicons/octicons.generated'
 import { IConstrainedValue } from '../lib/app-state'
 import { clamp } from '../lib/clamp'
 import { reduceTerminalSessions } from './terminal-sessions'
+import { ITerminalCommandRequest } from './terminal-command'
 
 export type BottomPanelMode = 'terminal' | 'dotfiles'
 
@@ -31,6 +32,12 @@ interface ITerminalPanelHostProps {
   readonly fontSize: number
   readonly cursorBlink: boolean
   readonly scrollback: number
+
+  /**
+   * The latest request to run a command in a new terminal tab. Only the
+   * session for the request's repository sees it.
+   */
+  readonly commandRequest: ITerminalCommandRequest | null
 
   readonly onResize: (height: number) => void
   readonly onResetHeight: () => void
@@ -79,8 +86,14 @@ export class TerminalPanelHost extends React.Component<
   }
 
   private renderSession(repoPath: string) {
-    const { activeRepoPath, mode, fontSize, cursorBlink, scrollback } =
-      this.props
+    const {
+      activeRepoPath,
+      mode,
+      fontSize,
+      cursorBlink,
+      scrollback,
+      commandRequest,
+    } = this.props
     const isActive = repoPath === activeRepoPath
 
     return (
@@ -98,6 +111,9 @@ export class TerminalPanelHost extends React.Component<
             fontSize={fontSize}
             cursorBlink={cursorBlink}
             scrollback={scrollback}
+            commandRequest={
+              commandRequest?.repoPath === repoPath ? commandRequest : null
+            }
           />
         </div>
         <div

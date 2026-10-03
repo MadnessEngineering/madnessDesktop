@@ -56,6 +56,7 @@ import { TitleBar, ZoomInfo, FullScreenInfo } from './window'
 import { RepositoriesList } from './repositories-list'
 import { RepositoryView } from './repository'
 import { TerminalPanelHost, BottomPanelMode } from './terminal-panel-host'
+import { ITerminalCommandRequest } from './terminal-command'
 import { RenameBranch } from './rename-branch'
 import { DeleteBranch, DeleteRemoteBranch } from './delete-branch'
 import { CloningRepositoryView } from './cloning-repository'
@@ -354,6 +355,8 @@ export class App extends React.Component<IAppProps, IAppState> {
   private bottomPanelEverOpened = false
   private bottomPanelMode: BottomPanelMode = 'terminal'
   private bottomPanelStartupApplied = false
+  /** The latest request to run a command in a new terminal tab. */
+  private terminalCommandRequest: ITerminalCommandRequest | null = null
 
   /**
    * Gets a value indicating whether or not we're currently showing a
@@ -407,6 +410,12 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     props.appStore.onDidError(error => {
       props.dispatcher.postError(error)
+    })
+
+    props.appStore.onTerminalCommandRequested(request => {
+      this.terminalCommandRequest = request
+      this.bottomPanelMode = 'terminal'
+      this.setBottomPanelVisible(true)
     })
 
     ipcRenderer.on('menu-event', name => this.onMenuEvent(name))
@@ -3797,6 +3806,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         fontSize={this.state.terminalFontSize}
         cursorBlink={this.state.terminalCursorBlink}
         scrollback={this.state.terminalScrollback}
+        commandRequest={this.terminalCommandRequest}
         onResize={this.onTerminalResize}
         onResetHeight={this.onResetTerminalHeight}
         onSetMode={this.setBottomPanelMode}
