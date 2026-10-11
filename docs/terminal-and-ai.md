@@ -70,3 +70,24 @@ enabled.
 
 It only ever appends to `settings.json`, and it records what it added, so
 **Uninstall** removes exactly those entries and leaves your own hooks alone.
+
+### Session colors
+
+Every tier colors each Claude Code session's prompt bar by project, so a
+screen of parallel sessions sorts itself at a glance. The project is the
+git repository the session starts in (a submodule counts as its own
+project), and each one keeps the same color every time.
+
+- **Pick your own colors** in `~/.claude/session_colors.json`:
+  `{"my-project": "cyan"}`. The choices are `red`, `blue`, `green`,
+  `yellow`, `purple`, `orange`, `pink`, and `cyan`; projects you don't list
+  get a color derived from their name.
+- **`/color` still wins.** The hooks never overwrite a color you set yourself.
+- **Turn it off** with `"session_color": false` in `~/.claude/hooks_config.json`.
+
+Background sessions (`claude --bg`, forks) take their color right away. A
+normal terminal session picks it up the next time you `/resume` it.
+
+The hooks set the color by writing the same files `/color` does — Claude
+Code has no official hook setting for it. A Claude Code update could stop it
+working; if that happens, sessions simply keep the default color.
