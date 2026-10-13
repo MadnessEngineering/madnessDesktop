@@ -95,12 +95,15 @@ export function startAuth0Login(): Promise<string> {
   })
 }
 
-/** True if the given protocol URL is an Auth0 login callback we should handle. */
+/**
+ * True if the given protocol URL is an Auth0 login callback we should handle.
+ *
+ * Only the `callback` host belongs to Auth0. GitHub's OAuth sign-in comes back
+ * on the same scheme as `<scheme>://oauth?code=…` and must fall through to the
+ * renderer, so matching the bare scheme would swallow it.
+ */
 export function isAuth0CallbackURL(url: string): boolean {
-  return (
-    url.startsWith('x-madness-desktop-auth://') ||
-    url.startsWith('x-madness-desktop-dev-auth://')
-  )
+  return /^x-madness-desktop(-dev)?-auth:\/\/callback(?:[/?#]|$)/i.test(url)
 }
 
 /**

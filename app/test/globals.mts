@@ -18,6 +18,9 @@ Object.assign(globalThis, {
   __DARWIN__: process.platform === 'darwin',
   __WIN32__: process.platform === 'win32',
   __LINUX__: process.platform === 'linux',
+  __AUTH0_DOMAIN__: '',
+  __AUTH0_AUDIENCE__: '',
+  __AUTH0_CLIENT_ID__: '',
   log: {
     error: () => {},
     warn: () => {},
