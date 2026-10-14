@@ -3,7 +3,7 @@
   "productName": "Madness Desktop",
   "bundleID": "cc.madnessinteractive.MadnessDesktop",
   "companyName": "Madness Interactive",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "main": "./main.js",
   "repository": {
     "type": "git",
