@@ -1,6 +1,10 @@
 import * as React from 'react'
 import { Account, isDotComAccount } from '../../models/account'
 import { PreferencesTab } from '../../models/preferences'
+import type {
+  MadnessSignInResult,
+  MadnessSignInStep,
+} from '../../models/omnispindle'
 import { Dispatcher } from '../dispatcher'
 import { TabBar, TabBarType } from '../tab-bar'
 import { Accounts } from './accounts'
@@ -635,6 +639,9 @@ export class Preferences extends React.Component<
             onDotComSignIn={this.onDotComSignIn}
             onEnterpriseSignIn={this.onEnterpriseSignIn}
             onLogout={this.onLogout}
+            hasOmnispindleKey={this.state.omnispindleApiKey.trim().length > 0}
+            onMadnessSignIn={this.onMadnessSignIn}
+            onCancelMadnessSignIn={this.onCancelMadnessSignIn}
           />
         )
         break
@@ -829,6 +836,7 @@ export class Preferences extends React.Component<
           <AIServicesPreferences
             apiKey={this.state.omnispindleApiKey}
             onApiKeyChanged={this.onOmnispindleApiKeyChanged}
+            onMadnessSignIn={this.onMadnessSignIn}
             localAIConfig={this.state.localAIConfig}
             onLocalAIConfigChanged={this.onLocalAIConfigChanged}
             showSecuritySettings={enableLocalAISecuritySettings()}
@@ -948,6 +956,27 @@ export class Preferences extends React.Component<
 
   private onOmnispindleApiKeyChanged = (omnispindleApiKey: string) => {
     this.setState({ omnispindleApiKey })
+  }
+
+  /**
+   * Run the combined GitHub + Madness Interactive sign-in. A freshly minted
+   * Omnispindle key goes into local state too, otherwise saving these
+   * preferences would write the old key back over it.
+   */
+  private onMadnessSignIn = async (
+    onProgress: (step: MadnessSignInStep) => void
+  ): Promise<MadnessSignInResult> => {
+    const result = await this.props.dispatcher.signInToMadnessInteractive(
+      onProgress
+    )
+    if (result.kind === 'success' && result.apiKey !== null) {
+      this.setState({ omnispindleApiKey: result.apiKey })
+    }
+    return result
+  }
+
+  private onCancelMadnessSignIn = () => {
+    this.props.dispatcher.resetSignInState()
   }
 
   private onMqttConfigChanged = (mqttConfig: IMqttConfig) => {

@@ -40,7 +40,9 @@ export class Start extends React.Component<IStartProps, {}> {
               <p id="start-description" className="welcome-text">
                 Madness Desktop is a seamless way to contribute to projects on
                 GitHub and GitHub Enterprise. Sign in below to get started with
-                your existing projects.
+                your existing projects. Signing in to GitHub.com also connects
+                your Madness Interactive account (Omnispindle) in a second
+                browser step.
               </p>
             </>
           ) : (
@@ -96,8 +98,8 @@ export class Start extends React.Component<IStartProps, {}> {
             </LinkButton>
           </p>
           <p>
-            Madness Desktop sends usage metrics to improve the product and inform
-            feature decisions.{' '}
+            Madness Desktop sends usage metrics to improve the product and
+            inform feature decisions.{' '}
             <LinkButton uri={SamplesURL}>
               Learn more about user metrics.
             </LinkButton>
@@ -113,7 +115,16 @@ export class Start extends React.Component<IStartProps, {}> {
     }
 
     this.props.advance(WelcomeStep.SignInToDotComWithBrowser)
-    this.props.dispatcher.requestBrowserAuthenticationToDotcom()
+    // The welcome flow follows the GitHub step through the sign-in state as
+    // before. The Madness Interactive step runs after it in the background
+    // and its key lands via the main process, so only failures need handling.
+    this.props.dispatcher.signInToMadnessInteractive().then(result => {
+      if (result.kind === 'error') {
+        log.warn(
+          `[welcome] Madness Interactive sign-in failed: ${result.message}`
+        )
+      }
+    })
   }
 
   private cancelBrowserAuth = () => {

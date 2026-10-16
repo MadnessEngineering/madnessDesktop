@@ -4,7 +4,11 @@ import { TextBox } from '../lib/text-box'
 import { Button } from '../lib/button'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
 import { invokeProxy } from '../main-process-proxy'
-import type { OmnispindleTestResult } from '../../models/omnispindle'
+import type {
+  OmnispindleTestResult,
+  MadnessSignInResult,
+  MadnessSignInStep,
+} from '../../models/omnispindle'
 import {
   ILocalAIConfig,
   LocalAIProvider,
@@ -17,6 +21,10 @@ interface IAIServicesPreferencesProps {
   // Omnispindle
   readonly apiKey: string
   readonly onApiKeyChanged: (value: string) => void
+  /** Combined GitHub + Madness Interactive sign-in (see Preferences). */
+  readonly onMadnessSignIn: (
+    onProgress: (step: MadnessSignInStep) => void
+  ) => Promise<MadnessSignInResult>
   // Local AI
   readonly localAIConfig: ILocalAIConfig
   readonly onLocalAIConfigChanged: (config: ILocalAIConfig) => void
@@ -25,7 +33,7 @@ interface IAIServicesPreferencesProps {
 
 type TestStatus =
   | { kind: 'idle' }
-  | { kind: 'testing' }
+  | { kind: 'testing'; message?: string }
   | { kind: 'success'; message: string }
   | { kind: 'error'; message: string }
 
@@ -42,7 +50,6 @@ interface IAIServicesPreferencesState {
 }
 
 const testConnectionIpc = invokeProxy('omnispindle-test', 1)
-const auth0LoginIpc = invokeProxy('auth0-login', 0)
 
 export class AIServicesPreferences extends React.Component<
   IAIServicesPreferencesProps,
@@ -112,32 +119,37 @@ export class AIServicesPreferences extends React.Component<
   }
 
   private onSignIn = async () => {
-    this.setState({ omnispindleSignInStatus: { kind: 'testing' } })
-    try {
-      const result = await auth0LoginIpc()
-      if (result.ok) {
-        // Persists to localStorage + reconfigures the main process.
-        this.props.onApiKeyChanged(result.apiKey)
-        this.setState({
-          omnispindleSignInStatus: {
-            kind: 'success',
-            message: result.keyPrefix
-              ? `Signed in — key ${result.keyPrefix}…`
-              : 'Signed in — API key saved',
-          },
-        })
-      } else {
-        this.setState({
-          omnispindleSignInStatus: { kind: 'error', message: result.error },
-        })
-      }
-    } catch (err) {
+    this.setState({
+      omnispindleSignInStatus: { kind: 'testing' },
+    })
+    const result = await this.props.onMadnessSignIn(step =>
       this.setState({
         omnispindleSignInStatus: {
-          kind: 'error',
-          message: err instanceof Error ? err.message : 'Sign in failed',
+          kind: 'testing',
+          message:
+            step === 'github'
+              ? 'Finish signing in to GitHub in your browser…'
+              : 'Finish signing in to Madness Interactive in your browser…',
         },
       })
+    )
+
+    if (result.kind === 'success') {
+      // Preferences already copied a new key into its state (and so into the
+      // API Key field), so there's nothing to set here.
+      this.setState({
+        omnispindleSignInStatus: {
+          kind: 'success',
+          message:
+            result.apiKey !== null ? 'Signed in — API key saved' : 'Signed in',
+        },
+      })
+    } else if (result.kind === 'error') {
+      this.setState({
+        omnispindleSignInStatus: { kind: 'error', message: result.message },
+      })
+    } else {
+      this.setState({ omnispindleSignInStatus: { kind: 'idle' } })
     }
   }
 
@@ -148,7 +160,7 @@ export class AIServicesPreferences extends React.Component<
     if (status.kind === 'testing') {
       return (
         <p className="omnispindle-test-status omnispindle-test-working">
-          Working…
+          {status.message ?? 'Working…'}
         </p>
       )
     }
@@ -212,8 +224,8 @@ export class AIServicesPreferences extends React.Component<
           {this.renderStatusLine(this.state.omnispindleSignInStatus)}
         </div>
         <p className="git-settings-description">
-          Signs you in and generates an API key automatically. Or paste one
-          manually below.
+          Signs you in to GitHub and Madness Interactive, and generates an API
+          key automatically. Or paste one manually below.
         </p>
 
         <TextBox

@@ -252,9 +252,7 @@ export const quitAndInstallUpdate = sendProxy('quit-and-install-updates', 0)
 export const quitApp = sendProxy('quit-app', 0)
 
 /** Subscribes to auto updater error events originating from the main process */
-export function onAutoUpdaterError(
-  errorHandler: (error: Error) => void
-) {
+export function onAutoUpdaterError(errorHandler: (error: Error) => void) {
   ipcRenderer.on('auto-updater-error', errorHandler)
 }
 
@@ -484,3 +482,10 @@ export const requestNotificationsPermission = invokeProxy(
 /** Tell the main process to (un)install the CLI on Windows */
 export const installWindowsCLI = sendProxy('install-windows-cli', 0)
 export const uninstallWindowsCLI = sendProxy('uninstall-windows-cli', 0)
+
+/**
+ * Run the Madness Interactive (Auth0) login in the system browser and mint an
+ * Omnispindle API key. The main process saves the key and pushes it back over
+ * `omnispindle-api-key-set`.
+ */
+export const auth0Login = invokeProxy('auth0-login', 0)

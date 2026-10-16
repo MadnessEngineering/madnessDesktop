@@ -544,6 +544,49 @@
 }
 
 #preferences {
+  .madness-sign-in {
+    margin-bottom: var(--spacing-double);
+
+    .madness-sign-in-description {
+      margin-top: 0;
+      color: var(--text-secondary-color);
+    }
+
+    .madness-sign-in-checklist {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 var(--spacing) 0;
+
+      li {
+        margin-bottom: var(--spacing-half);
+
+        &.done {
+          color: var(--color-ansi-green, #28a745);
+        }
+
+        &.pending {
+          color: var(--text-secondary-color);
+        }
+      }
+    }
+
+    .madness-sign-in-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .madness-sign-in-status {
+      font-size: 0.82rem;
+      margin: 8px 0 0 0;
+      color: var(--text-secondary-color);
+
+      &.madness-sign-in-error {
+        color: var(--error-color, #d73a49);
+      }
+    }
+  }
+
   .omnispindle-preferences-section {
     .omnispindle-test-row {
       display: flex;

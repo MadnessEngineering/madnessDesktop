@@ -59,7 +59,7 @@ import type { IBYOKProvider } from '../../lib/copilot/byok'
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
 import { getTipSha } from '../../lib/tip'
 
-import { Account } from '../../models/account'
+import { Account, isDotComAccount } from '../../models/account'
 import { AppMenu, ExecutableMenuItem } from '../../models/app-menu'
 import { Author, UnknownAuthor } from '../../models/author'
 import { Branch, IAheadBehind } from '../../models/branch'
@@ -102,6 +102,7 @@ import {
   moveToApplicationsFolder,
   isWindowFocused,
   writeCLIResult,
+  auth0Login,
 } from '../main-process-proxy'
 import {
   CommitStatusStore,
@@ -129,7 +130,11 @@ import { ICombinedRefCheck, IRefCheck } from '../../lib/ci-checks/ci-checks'
 import { ValidNotificationPullRequestReviewState } from '../../lib/valid-notification-pull-request-review'
 import { UnreachableCommitsTab } from '../history/unreachable-commits-dialog'
 import { sendNonFatalException } from '../../lib/helpers/non-fatal-exception'
-import { SignInResult } from '../../lib/stores/sign-in-store'
+import { SignInResult, SignInStep } from '../../lib/stores/sign-in-store'
+import type {
+  MadnessSignInResult,
+  MadnessSignInStep,
+} from '../../models/omnispindle'
 import { ICustomIntegration } from '../../lib/custom-integration'
 import { isAbsolute } from 'path'
 import { CLIAction, GroupCLIOp } from '../../lib/cli-action'
@@ -1886,6 +1891,82 @@ export class Dispatcher {
   ) {
     this.appStore._beginDotComSignIn(resultCallback)
     this.requestBrowserAuthentication()
+  }
+
+  /**
+   * Sign in to everything Madness Desktop needs in one go: GitHub.com first
+   * (git credentials and the API), then the Madness Interactive Auth0 login,
+   * which mints the Omnispindle API key. Steps that are already done are
+   * skipped. Both run in the system browser.
+   *
+   * The two logins are separate on purpose. Only the GitHub account feeds git,
+   * so signing in to Madness Interactive alone leaves private repositories
+   * unreachable.
+   *
+   * Cancel the GitHub step with `resetSignInState`. The Auth0 step times out on
+   * its own after five minutes.
+   */
+  public async signInToMadnessInteractive(
+    onProgress?: (step: MadnessSignInStep) => void
+  ): Promise<MadnessSignInResult> {
+    const { accounts, omnispindleApiKey } = this.appStore.getState()
+
+    if (!accounts.some(isDotComAccount)) {
+      onProgress?.('github')
+      const github = await this.signInToDotComWithBrowser()
+      if (github.kind !== 'success') {
+        return github
+      }
+    }
+
+    if (omnispindleApiKey.trim().length > 0) {
+      return { kind: 'success', apiKey: null }
+    }
+
+    onProgress?.('omnispindle')
+    try {
+      const result = await auth0Login()
+      return result.ok
+        ? { kind: 'success', apiKey: result.apiKey }
+        : { kind: 'error', message: result.error }
+    } catch (e) {
+      return {
+        kind: 'error',
+        message: e instanceof Error ? e.message : String(e),
+      }
+    }
+  }
+
+  /**
+   * Browser sign-in to GitHub.com as a promise. The sign-in store reports a
+   * failed token exchange through its state, not the result callback, so
+   * watch for that too or the promise would never settle.
+   */
+  private signInToDotComWithBrowser(): Promise<MadnessSignInResult> {
+    return new Promise(resolve => {
+      let subscription: Disposable | null = null
+      const settle = (result: MadnessSignInResult) => {
+        subscription?.dispose()
+        resolve(result)
+      }
+
+      this.requestBrowserAuthenticationToDotcom(result =>
+        settle(
+          result.kind === 'success'
+            ? { kind: 'success', apiKey: null }
+            : { kind: 'cancelled' }
+        )
+      )
+
+      subscription = this.appStore.onDidUpdate(({ signInState }) => {
+        if (
+          signInState?.kind === SignInStep.Authentication &&
+          signInState.error !== null
+        ) {
+          settle({ kind: 'error', message: signInState.error.message })
+        }
+      })
+    })
   }
 
   /**
