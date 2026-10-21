@@ -20,6 +20,7 @@ interface IAdvancedPreferencesProps {
   readonly repositoryIndicatorsEnabled: boolean
   readonly autoSwitchOnChangesEnabled: boolean
   readonly worktreesEnabled: boolean
+  readonly madnessModeEnabled: boolean
   readonly showReflogTab: boolean
   readonly terminalOpenOnStartup: boolean
   readonly terminalFontSize: number
@@ -31,6 +32,7 @@ interface IAdvancedPreferencesProps {
   readonly onRepositoryIndicatorsEnabledChanged: (enabled: boolean) => void
   readonly onAutoSwitchOnChangesEnabledChanged: (enabled: boolean) => void
   readonly onWorktreesEnabledChanged: (enabled: boolean) => void
+  readonly onMadnessModeEnabledChanged: (enabled: boolean) => void
   readonly onShowReflogTabChanged: (value: boolean) => void
   readonly onTerminalOpenOnStartupChanged: (value: boolean) => void
   readonly onTerminalFontSizeChanged: (value: number) => void
@@ -114,6 +116,12 @@ export class Advanced extends React.Component<
     event: React.FormEvent<HTMLInputElement>
   ) => {
     this.props.onWorktreesEnabledChanged(event.currentTarget.checked)
+  }
+
+  private onMadnessModeEnabledChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onMadnessModeEnabledChanged(event.currentTarget.checked)
   }
 
   private onTerminalOpenOnStartupChanged = (
@@ -235,6 +243,25 @@ export class Advanced extends React.Component<
               the menu. Turning this off switches the current repository back to
               its main worktree first, so you won't be stranded on a linked
               worktree.
+            </p>
+          </div>
+          <Checkbox
+            label="Madness Mode"
+            value={
+              this.props.madnessModeEnabled
+                ? CheckboxValue.On
+                : CheckboxValue.Off
+            }
+            onChange={this.onMadnessModeEnabledChanged}
+            ariaDescribedBy="madness-mode-enabled-description"
+          />
+          <div
+            id="madness-mode-enabled-description"
+            className="git-settings-description"
+          >
+            <p>
+              Unlock power-user git controls. Every power action previews its
+              git command and how to undo it.
             </p>
           </div>
         </div>

@@ -390,6 +390,9 @@ export interface IAppState {
   /** Whether the worktree dropdown and worktree actions are available */
   readonly worktreesEnabled: boolean
 
+  /** Whether Madness Mode (power-user git controls) is turned on */
+  readonly madnessModeEnabled: boolean
+
   /** Whether to show the Reflog tab in the repository sidebar */
   readonly showReflogTab: boolean
 

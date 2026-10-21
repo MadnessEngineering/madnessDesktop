@@ -137,6 +137,7 @@ interface IPreferencesProps {
   readonly repositoryIndicatorsEnabled: boolean
   readonly autoSwitchOnChangesEnabled: boolean
   readonly worktreesEnabled: boolean
+  readonly madnessModeEnabled: boolean
   readonly showReflogTab: boolean
   readonly terminalOpenOnStartup: boolean
   readonly terminalFontSize: number
@@ -203,6 +204,7 @@ interface IPreferencesState {
   readonly repositoryIndicatorsEnabled: boolean
   readonly autoSwitchOnChangesEnabled: boolean
   readonly worktreesEnabled: boolean
+  readonly madnessModeEnabled: boolean
   readonly showReflogTab: boolean
   readonly terminalOpenOnStartup: boolean
   readonly terminalFontSize: number
@@ -311,6 +313,7 @@ export class Preferences extends React.Component<
       repositoryIndicatorsEnabled: this.props.repositoryIndicatorsEnabled,
       autoSwitchOnChangesEnabled: this.props.autoSwitchOnChangesEnabled,
       worktreesEnabled: this.props.worktreesEnabled,
+      madnessModeEnabled: this.props.madnessModeEnabled,
       showReflogTab: this.props.showReflogTab,
       terminalOpenOnStartup: this.props.terminalOpenOnStartup,
       terminalFontSize: this.props.terminalFontSize,
@@ -870,6 +873,7 @@ export class Preferences extends React.Component<
             repositoryIndicatorsEnabled={this.state.repositoryIndicatorsEnabled}
             autoSwitchOnChangesEnabled={this.state.autoSwitchOnChangesEnabled}
             worktreesEnabled={this.state.worktreesEnabled}
+            madnessModeEnabled={this.state.madnessModeEnabled}
             showReflogTab={this.state.showReflogTab}
             terminalOpenOnStartup={this.state.terminalOpenOnStartup}
             terminalFontSize={this.state.terminalFontSize}
@@ -887,6 +891,7 @@ export class Preferences extends React.Component<
               this.onAutoSwitchOnChangesEnabledChanged
             }
             onWorktreesEnabledChanged={this.onWorktreesEnabledChanged}
+            onMadnessModeEnabledChanged={this.onMadnessModeEnabledChanged}
             onShowReflogTabChanged={this.onShowReflogTabChanged}
             onTerminalOpenOnStartupChanged={this.onTerminalOpenOnStartupChanged}
             onTerminalFontSizeChanged={this.onTerminalFontSizeChanged}
@@ -932,6 +937,10 @@ export class Preferences extends React.Component<
 
   private onWorktreesEnabledChanged = (worktreesEnabled: boolean) => {
     this.setState({ worktreesEnabled })
+  }
+
+  private onMadnessModeEnabledChanged = (madnessModeEnabled: boolean) => {
+    this.setState({ madnessModeEnabled })
   }
 
   private onShowReflogTabChanged = (showReflogTab: boolean) => {
@@ -1281,6 +1290,10 @@ export class Preferences extends React.Component<
 
       if (this.props.worktreesEnabled !== this.state.worktreesEnabled) {
         await dispatcher.setWorktreesEnabled(this.state.worktreesEnabled)
+      }
+
+      if (this.props.madnessModeEnabled !== this.state.madnessModeEnabled) {
+        dispatcher.setMadnessModeEnabled(this.state.madnessModeEnabled)
       }
 
       if (this.props.showReflogTab !== this.state.showReflogTab) {

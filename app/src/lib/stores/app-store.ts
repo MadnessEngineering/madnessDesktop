@@ -597,6 +597,7 @@ const shellKey = 'shell'
 const repositoryIndicatorsEnabledKey = 'enable-repository-indicators'
 const autoSwitchOnChangesKey = 'enable-auto-switch-on-changes'
 const worktreesEnabledKey = 'worktrees-enabled'
+const madnessModeEnabledKey = 'madness-mode-enabled'
 const showReflogTabKey = 'show-reflog-tab'
 const terminalOpenOnStartupKey = 'terminal-open-on-startup'
 const terminalFontSizeKey = 'terminal-font-size'
@@ -683,6 +684,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     DefaultChatHistoryArchiveConfig
   private autoSwitchOnChangesEnabled = false
   private worktreesEnabled = true
+  private madnessModeEnabled = false
 
   private showWelcomeFlow = false
   private focusCommitMessage = false
@@ -943,6 +945,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       enableAutoSwitchOnChanges()
 
     this.worktreesEnabled = getBoolean(worktreesEnabledKey) ?? true
+    this.madnessModeEnabled = getBoolean(madnessModeEnabledKey) ?? false
 
     this.showReflogTab = getBoolean(showReflogTabKey, false)
     this.terminalOpenOnStartup = getBoolean(terminalOpenOnStartupKey, false)
@@ -1557,6 +1560,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       repositoryIndicatorsEnabled: this.repositoryIndicatorsEnabled,
       autoSwitchOnChangesEnabled: this.autoSwitchOnChangesEnabled,
       worktreesEnabled: this.worktreesEnabled,
+      madnessModeEnabled: this.madnessModeEnabled,
       showReflogTab: this.showReflogTab,
       terminalOpenOnStartup: this.terminalOpenOnStartup,
       terminalFontSize: this.terminalFontSize,
@@ -4921,6 +4925,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     setBoolean(worktreesEnabledKey, enabled)
     this.worktreesEnabled = enabled
+    this.emitUpdate()
+  }
+
+  public _setMadnessModeEnabled(enabled: boolean) {
+    if (this.madnessModeEnabled === enabled) {
+      return
+    }
+
+    setBoolean(madnessModeEnabledKey, enabled)
+    this.madnessModeEnabled = enabled
     this.emitUpdate()
   }
 

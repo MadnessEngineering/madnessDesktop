@@ -396,6 +396,10 @@ export class App extends React.Component<IAppProps, IAppState> {
     })
 
     this.state = props.appStore.getState()
+    document.body.classList.toggle(
+      'madness-mode',
+      this.state.madnessModeEnabled
+    )
 
     this.repoNavHistory = [...getNumberArray(repoNavHistoryKey)]
     this.repoNavIndex = Math.min(
@@ -405,6 +409,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     props.appStore.onDidUpdate(state => {
       this.setState(state)
+      document.body.classList.toggle('madness-mode', state.madnessModeEnabled)
       this.trackRepoNavSelection(state)
     })
 
@@ -2094,6 +2099,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             repositoryIndicatorsEnabled={this.state.repositoryIndicatorsEnabled}
             autoSwitchOnChangesEnabled={this.state.autoSwitchOnChangesEnabled}
             worktreesEnabled={this.state.worktreesEnabled}
+            madnessModeEnabled={this.state.madnessModeEnabled}
             showReflogTab={this.state.showReflogTab}
             terminalOpenOnStartup={this.state.terminalOpenOnStartup}
             terminalFontSize={this.state.terminalFontSize}

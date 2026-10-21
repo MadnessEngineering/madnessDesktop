@@ -3330,6 +3330,10 @@ export class Dispatcher {
     return this.appStore._setWorktreesEnabled(enabled)
   }
 
+  public setMadnessModeEnabled(enabled: boolean) {
+    this.appStore._setMadnessModeEnabled(enabled)
+  }
+
   public setShowReflogTab(value: boolean) {
     this.appStore._setShowReflogTab(value)
   }
