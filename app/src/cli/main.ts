@@ -3,6 +3,7 @@ import parse from 'minimist'
 import { execFile, spawn } from 'child_process'
 import { existsSync, readFileSync, unlinkSync } from 'fs'
 import { tmpdir } from 'os'
+import { runSnapshot } from './snapshot'
 
 const run = (...args: Array<string>) => {
   function cb(e: unknown | null, stderr?: string) {
@@ -66,7 +67,7 @@ const printResult = (path: string, timeoutMs = 60000): void => {
 
 const args = parse(process.argv.slice(2), {
   alias: { help: 'h', branch: 'b', group: 'g', recursive: 'r' },
-  boolean: ['help', 'recursive'],
+  boolean: ['help', 'recursive', 'json'],
   string: ['group'],
 })
 
@@ -86,6 +87,8 @@ const usage = (exitCode = 1): never => {
       '                                      and print the combined output\n' +
       '  madhub group <ls|create|rm> [name]  List / create / remove custom groups\n' +
       '  madhub fav [path]                   Toggle the repo as a favorite\n' +
+      '  madhub snapshot [--json] [path ...] Print a read-only git snapshot (branch, changes,\n' +
+      '                                      recent commits, stash, drift) without opening the app\n' +
       '  madhub upgrade                      Download and install the latest release\n'
   )
   process.exit(exitCode)
@@ -102,6 +105,14 @@ const command = args._.at(0)
 
 if (args.help || command === 'help') {
   usage(0)
+} else if (command === 'snapshot') {
+  runSnapshot(args._.slice(1).map(String), args.json === true).then(
+    code => process.exit(code),
+    e => {
+      process.stderr.write(`madhub snapshot: ${e}\n`)
+      process.exit(1)
+    }
+  )
 } else if (command === 'clone') {
   const urlArg = args._.at(1)
   // Assume name with owner slug if it looks like it
@@ -133,7 +144,9 @@ if (args.help || command === 'help') {
 } else if (command === 'sub') {
   const op = args._.at(1)
   if (typeof op !== 'string' || !SUBMODULE_OPS.includes(op)) {
-    process.stderr.write(`madhub sub: expected one of ${SUBMODULE_OPS.join('|')}\n`)
+    process.stderr.write(
+      `madhub sub: expected one of ${SUBMODULE_OPS.join('|')}\n`
+    )
     usage(1)
   }
   // `madhub sub <op> [repo path] [submodule path]`. sync/rollback need a sub.
@@ -155,7 +168,9 @@ if (args.help || command === 'help') {
     process.stderr.write('madhub foreach: a <command> is required\n')
     usage(1)
   }
-  const repoPath = resolve(typeof args._.at(2) === 'string' ? args._.at(2)! : '.')
+  const repoPath = resolve(
+    typeof args._.at(2) === 'string' ? args._.at(2)! : '.'
+  )
   const resultPath = tempResultPath()
   const flags = [
     `--cli-foreach=${cmd}`,
@@ -170,7 +185,9 @@ if (args.help || command === 'help') {
 } else if (command === 'group') {
   const op = args._.at(1)
   if (typeof op !== 'string' || !GROUP_OPS.includes(op)) {
-    process.stderr.write(`madhub group: expected one of ${GROUP_OPS.join('|')}\n`)
+    process.stderr.write(
+      `madhub group: expected one of ${GROUP_OPS.join('|')}\n`
+    )
     usage(1)
   }
   if ((op === 'create' || op === 'rm') && typeof args._.at(2) !== 'string') {
