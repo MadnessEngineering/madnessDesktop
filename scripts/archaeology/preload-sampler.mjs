@@ -12,8 +12,11 @@
 //      no session writes).
 //   B. get_context_bundle as the Omnispindle server ships it today.
 //   C. Git-aware prototype: local git snapshot + todos ranked by file overlap
-//      + lessons by similarity. The ranking runs here, client side, until it
-//      moves into Omnispindle.
+//      + lessons by similarity. The ranking runs here, client side.
+//   D. The real SessionStart path: Anathesmelt's work_context.py
+//      build_work_context(), imported and called. Server-side ranking via
+//      get_context_bundle(files, branch, query). This is what the hook injects
+//      when hooks_config git_context_injection is on.
 //
 // Omnispindle is reached the same way agents reach it: the HTTP MCP endpoint
 // and Authorization header from ~/.claude.json. The header is never printed.
@@ -208,7 +211,10 @@ async function gitAware(repo, maxTodos, maxLessons) {
   })
   const items = todosRes.data?.items || []
   const ranked = items.map(td => {
-    const files = td.metadata?.files || td.files || []
+    // metadata.files is usually a list; some todos store one comma/newline-separated string
+    let files = td.metadata?.files || td.files || []
+    if (typeof files === 'string') files = files.split(/[,\n]/).map(f => f.trim()).filter(Boolean)
+    if (!Array.isArray(files)) files = []
     const hits = touched.filter(f => files.some(tf => sameFile(f, tf)))
     let score = hits.length * 3
     const why = []
@@ -263,17 +269,44 @@ async function gitAware(repo, maxTodos, maxLessons) {
   }
 }
 
+// ---------- panel D: the real SessionStart hook path ----------
+
+async function hookPath(repo, maxTodos) {
+  const py = `
+import sys, json, time
+sys.path.insert(0, ${JSON.stringify(HOOKS)})
+import work_context as w
+t = time.time(); text, debug = w.build_work_context(${JSON.stringify(repo)}, limit=${Number(maxTodos)})
+debug.pop('work_context', None)
+print(json.dumps({"text": text, "debug": debug, "ms": int((time.time()-t)*1000)}))`
+  const r = await run(UV, ['run', '--quiet', '--python', '3.12', 'python', '-c', py], { cwd: repo })
+  if (!r.ok) return { error: (r.stderr || String(r.err)).trim().split('\n').slice(-3).join('\n') }
+  const d = JSON.parse(r.stdout.trim().split('\n').pop())
+  return {
+    text: d.text || '',
+    notes: [
+      `snapshot from ${d.debug.snapshot_source || '?'}`,
+      d.debug.reason || 'server work_context ok',
+      'regex lesson hits are dropped; only semantic matches are injected',
+      'gated by hooks_config git_context_injection (default off); fresh sessions only',
+    ],
+    ms: d.ms,
+    perPrompt: false,
+  }
+}
+
 // ---------- server ----------
 
 async function sample(repo, opts) {
   const safe = async f => { try { return await f() } catch (e) { return { error: e.message } } }
-  const [a, b, c] = await Promise.all([
+  const [a, b, c, d] = await Promise.all([
     safe(() => oldHook(repo)),
     safe(() => bundleToday(repo)),
     safe(() => gitAware(repo, opts.maxTodos, opts.maxLessons)),
+    safe(() => hookPath(repo, opts.maxTodos)),
   ])
-  for (const p of [a, b, c]) if (p.text !== undefined) { p.chars = p.text.length; p.tokens = approxTokens(p.text) }
-  return { repo, project: projectFor(repo), panels: { old: a, today: b, gitAware: c } }
+  for (const p of [a, b, c, d]) if (p.text !== undefined) { p.chars = p.text.length; p.tokens = approxTokens(p.text) }
+  return { repo, project: projectFor(repo), panels: { old: a, today: b, gitAware: c, hook: d } }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -340,7 +373,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:13px}
 </div>
 <script>
 const $=s=>document.querySelector(s)
-const NAMES={old:'A · Old per-prompt hook',today:'B · get_context_bundle today',gitAware:'C · Git-aware prototype'}
+const NAMES={old:'A · Old per-prompt hook',today:'B · get_context_bundle today',gitAware:'C · Git-aware prototype',hook:'D · Real SessionStart path'}
 let last=null
 fetch('/api/repos').then(r=>r.json()).then(list=>{
   const saved=localStorage.getItem('repo')
