@@ -36,7 +36,30 @@ const UV = path.join(HOME, '.local/bin/uv')
 
 // ---------- helpers ----------
 
-const approxTokens = s => Math.ceil((s || '').length / 4)
+// chars/4 undercounted these blocks by ~42%: paths, hex ids and symbols
+// tokenize densely. Measured 2026-10-21 with the Measure button below
+// (D 693 chars = 290 tokens, B 2975 chars = 1268 tokens), so ~2.4 chars/token.
+const CHARS_PER_TOKEN = 2.4
+const approxTokens = s => Math.ceil((s || '').length / CHARS_PER_TOKEN)
+
+// Exact count: input-token delta of `claude -p` with and without the block,
+// using a fixed system prompt, no tools, no MCP and no hooks so the baseline
+// is stable (verified identical across runs). Costs a few thousand tokens.
+const CLAUDE_ARGS = ['-p', '--settings', '{"disableAllHooks": true}', '--strict-mcp-config',
+  '--mcp-config', '{"mcpServers":{}}', '--system-prompt', 'Reply with OK.', '--tools', '',
+  '--output-format', 'json', '--max-turns', '1']
+async function claudeInputTokens(prompt) {
+  const r = await run('claude', [...CLAUDE_ARGS, prompt], { timeout: 120000 })
+  if (!r.ok) throw new Error('claude -p failed: ' + (r.stderr || String(r.err)).slice(0, 200))
+  const u = JSON.parse(r.stdout).usage || {}
+  return (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0)
+}
+let baselineTokens = null
+async function exactTokens(text) {
+  if (!text) return 0
+  if (baselineTokens === null) baselineTokens = await claudeInputTokens('OK?')
+  return (await claudeInputTokens('OK?\n' + text)) - baselineTokens
+}
 
 function run(cmd, args, opts = {}) {
   return new Promise(resolve => {
@@ -297,6 +320,7 @@ print(json.dumps({"text": text, "debug": debug, "ms": int((time.time()-t)*1000)}
 
 // ---------- server ----------
 
+let lastSample = null
 async function sample(repo, opts) {
   const safe = async f => { try { return await f() } catch (e) { return { error: e.message } } }
   const [a, b, c, d] = await Promise.all([
@@ -306,7 +330,9 @@ async function sample(repo, opts) {
     safe(() => hookPath(repo, opts.maxTodos)),
   ])
   for (const p of [a, b, c, d]) if (p.text !== undefined) { p.chars = p.text.length; p.tokens = approxTokens(p.text) }
-  return { repo, project: projectFor(repo), panels: { old: a, today: b, gitAware: c, hook: d } }
+  const out = { repo, project: projectFor(repo), panels: { old: a, today: b, gitAware: c, hook: d } }
+  lastSample = out
+  return out
 }
 
 const server = http.createServer(async (req, res) => {
@@ -319,6 +345,16 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/api/repos') {
       res.writeHead(200, { 'content-type': 'application/json' })
       return res.end(JSON.stringify(listRepos()))
+    }
+    if (u.pathname === '/api/measure') {
+      if (!lastSample) { res.writeHead(400); return res.end('sample first') }
+      const exact = {}
+      for (const [k, p] of Object.entries(lastSample.panels)) {
+        if (p.text === undefined) continue
+        try { exact[k] = await exactTokens(p.text) } catch (e) { exact[k] = { error: e.message } }
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      return res.end(JSON.stringify({ repo: lastSample.repo, exact }))
     }
     if (u.pathname === '/api/sample') {
       const repo = u.searchParams.get('repo')
@@ -360,13 +396,13 @@ table{border-collapse:collapse;font-size:12px;width:100%}td,th{border-bottom:1px
 .sum{background:var(--surface);border:1px solid var(--rule);padding:12px 14px;font:13px ui-monospace,monospace}
 details summary{cursor:pointer;color:var(--muted);font-size:13px}
 </style></head><body><div class="wrap">
-<div><h1>Preload Sampler</h1><p class="muted">What each context path would inject for a repo, and roughly what it costs. Tokens are approximate (chars ÷ 4). Read-only.</p></div>
+<div><h1>Preload Sampler</h1><p class="muted">What each context path would inject for a repo, and what it costs. "≈" counts are estimates (chars ÷ 2.4, calibrated); <b>Measure exact</b> asks Claude for real counts (a few thousand tokens per click). Injected text stays in the conversation, so it is re-read as input on every later turn: a once-per-session block costs tokens × turns, and a per-prompt block adds a new copy each turn, so its total grows with the square of the turn count. Most of that re-reading hits the prompt cache, which is billed at about a tenth of the normal input price. Read-only.</p></div>
 <form id="f">
 <label>Repo<select id="repo"></select></label>
 <label>Max todos<input id="mt" type="number" min="0" max="10" value="3"></label>
 <label>Max lessons<input id="ml" type="number" min="0" max="10" value="3"></label>
-<label>Prompts per session<input id="pp" type="number" min="1" value="30"></label>
-<button>Sample</button><span id="status" class="muted"></span>
+<label>Turns per session<input id="pp" type="number" min="1" value="30"></label>
+<button>Sample</button><button type="button" id="measure" disabled>Measure exact</button><span id="status" class="muted"></span>
 </form>
 <div id="sum" class="sum" hidden></div>
 <div class="cols" id="cols"></div>
@@ -374,7 +410,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:13px}
 <script>
 const $=s=>document.querySelector(s)
 const NAMES={old:'A · Old per-prompt hook',today:'B · get_context_bundle today',gitAware:'C · Git-aware prototype',hook:'D · Real SessionStart path'}
-let last=null
+let last=null, exact={}
 fetch('/api/repos').then(r=>r.json()).then(list=>{
   const saved=localStorage.getItem('repo')
   for(const p of list){const o=document.createElement('option');o.value=p;o.textContent=p.split('/').pop();if(p===saved||(!saved&&p.endsWith('/madnessDesktop')))o.selected=true;$('#repo').append(o)}
@@ -389,9 +425,13 @@ function render(){
     const d=document.createElement('section');d.className='panel'
     let h='<h2>'+NAMES[k]+'</h2>'
     if(p.error){h+='<div class="err">'+esc(p.error)+'</div>';d.innerHTML=h;cols.append(d);continue}
-    const perSession=p.perPrompt?p.tokens*pp:p.tokens
-    sess[k]=perSession
-    h+='<div class="stats"><span><b>≈'+p.tokens+'</b> tok/injection</span><span><b>≈'+perSession+'</b> tok/session</span><span>'+p.chars+' chars</span><span>'+p.ms+' ms</span></div>'
+    const ex=typeof exact[k]==='number'?exact[k]:null
+    const t=ex??p.tokens, mark=ex===null?'≈':''
+    // once: block re-read on every turn (t*N); per prompt: copy i is re-read N-i+1 times (t*N(N+1)/2)
+    const perSession=p.perPrompt?t*pp*(pp+1)/2:t*pp
+    sess[k]=mark+Math.round(perSession).toLocaleString()
+    h+='<div class="stats"><span><b>'+mark+t.toLocaleString()+'</b> tok/injection'+(ex===null?'':' (measured)')+'</span><span><b>'+mark+Math.round(perSession).toLocaleString()+'</b> input tok/session</span><span>'+p.chars+' chars</span><span>'+p.ms+' ms</span></div>'
+    if(exact[k]&&exact[k].error)h+='<div class="err">measure: '+esc(exact[k].error)+'</div>'
     h+='<ul>'+(p.notes||[]).map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>'
     h+='<pre>'+(p.text?esc(p.text):'<span class="muted">(nothing injected)</span>')+'</pre>'
     if(p.candidates){
@@ -402,7 +442,7 @@ function render(){
     d.innerHTML=h;cols.append(d)
   }
   $('#sum').hidden=false
-  $('#sum').textContent='Per session at '+pp+' prompts: '+Object.entries(sess).map(([k,v])=>NAMES[k].split(' · ')[1]+' ≈'+v+' tok').join('   |   ')+'   (project "'+last.project+'")'
+  $('#sum').textContent='Input tokens over a '+pp+'-turn session: '+Object.entries(sess).map(([k,v])=>NAMES[k].split(' · ')[1]+' '+v).join('   |   ')+'   (project "'+last.project+'")'
 }
 $('#pp').addEventListener('input',render)
 $('#f').addEventListener('submit',async e=>{
@@ -410,7 +450,12 @@ $('#f').addEventListener('submit',async e=>{
   $('#status').textContent='Sampling…'
   const q=new URLSearchParams({repo,maxTodos:$('#mt').value,maxLessons:$('#ml').value})
   const r=await fetch('/api/sample?'+q);if(!r.ok){$('#status').textContent='Error: '+await r.text();return}
-  last=await r.json();$('#status').textContent='';render()
+  last=await r.json();exact={};$('#status').textContent='';$('#measure').disabled=false;render()
+})
+$('#measure').addEventListener('click',async()=>{
+  $('#measure').disabled=true;$('#status').textContent='Measuring with claude -p (about 10 s per panel)…'
+  const r=await fetch('/api/measure');if(!r.ok){$('#status').textContent='Error: '+await r.text();$('#measure').disabled=false;return}
+  exact=(await r.json()).exact;$('#status').textContent='';$('#measure').disabled=false;render()
 })
 </script></body></html>`
 
