@@ -91,3 +91,52 @@ normal terminal session picks it up the next time you `/resume` it.
 The hooks set the color by writing the same files `/color` does — Claude
 Code has no official hook setting for it. A Claude Code update could stop it
 working; if that happens, sessions simply keep the default color.
+
+### Session-start work context
+
+The hooks can open each new Claude Code session with a short note on what
+you're in the middle of: the repo's git state, plus up to three open
+Omnispindle todos that touch the files you're changing. Each todo says why
+it was picked (`touches app-store.ts`, `in progress`, `same branch`), so the
+agent can tell a real lead from noise.
+
+It's **off by default**. Turn it on with `"git_context_injection": true` in
+`~/.claude/hooks_config.json`. It runs on fresh sessions only, not on
+`/resume`.
+
+How it works:
+
+- **Git state** comes from `madhub snapshot --json`, which reads the repo
+  directly without opening the app. Installs older than that command fall
+  back to plain `git`.
+- **Todos** come from Omnispindle's `get_context_bundle` with the touched
+  files, branch and recent commit subjects. The server ranks open todos by
+  how many of those files they list in their own `files`.
+- **Lessons** are only included when the server can match them by meaning.
+  Right now it can only match by keyword, which proved to be noise, so no
+  lessons are injected yet.
+- Anything that fails (no repo, no network, an old server) just means no
+  note. A session never fails to start because of it.
+
+#### Preview it before turning it on
+
+The preload sampler shows exactly what would be injected for any repo, next
+to the other ways of feeding context, with token costs:
+
+```sh
+node scripts/archaeology/preload-sampler.mjs   # then open http://127.0.0.1:4747
+```
+
+![The preload sampler in the Mad Laboratory theme, comparing four context paths for madnessDesktop, with measured token counts](assets/preload-sampler.png)
+
+Panel **D** is the real session-start note. **Measure exact** asks Claude for
+true token counts (it costs a few thousand tokens per click); otherwise the
+counts are estimates. Injected text stays in the conversation and is
+re-read on every later turn, so the per-session figures multiply by the
+number of turns. For madnessDesktop the note measured about 350 tokens, or
+roughly 10,500 input tokens over a 30-turn session, most of it served from
+the prompt cache. The theme picker uses the same MadnessThemes palettes as
+the app.
+
+To re-shoot this screenshot, run the sampler, then
+`node scripts/archaeology/sampler-screenshot.mjs [repo] [theme]`.
