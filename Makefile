@@ -1,4 +1,4 @@
-.PHONY: all dev prod install install-app cli kill-app ready-publish
+.PHONY: all dev prod install install-app cli kill-app ready-publish sampler sampler-shot
 
 all: dev
 
@@ -47,3 +47,31 @@ kill-app:
 	for i in 1 2 3 4 5 6; do pgrep -x "Madness Desktop" >/dev/null 2>&1 || break; sleep 0.5; done; \
 	killall "Madness Desktop" >/dev/null 2>&1 || true; \
 	echo "Closed running Madness Desktop (if any)."
+
+# Preload sampler: compare what each context-injection path would hand an
+# agent, with token costs (docs/terminal-and-ai.md). Reuses a running server,
+# otherwise starts one in the foreground; Ctrl-C stops it.
+SAMPLER_PORT := 4747
+SAMPLER_URL := http://127.0.0.1:$(SAMPLER_PORT)
+
+sampler:
+	@if curl -sf -o /dev/null "$(SAMPLER_URL)/"; then \
+		echo "Sampler already running at $(SAMPLER_URL)"; open "$(SAMPLER_URL)"; \
+	else \
+		(sleep 1 && open "$(SAMPLER_URL)") & \
+		PORT=$(SAMPLER_PORT) node scripts/archaeology/preload-sampler.mjs; \
+	fi
+
+# Re-shoot docs/assets/preload-sampler.png (clicks Measure exact, so it spends
+# a few thousand Claude tokens). Starts a temporary sampler if none is up.
+# Override with: make sampler-shot REPO=Omnispindle THEME=terminal
+REPO ?= madnessDesktop
+THEME ?= mad-laboratory
+sampler-shot:
+	@STARTED=""; \
+	if ! curl -sf -o /dev/null "$(SAMPLER_URL)/"; then \
+		PORT=$(SAMPLER_PORT) node scripts/archaeology/preload-sampler.mjs >/dev/null & STARTED=$$!; \
+		for i in 1 2 3 4 5 6 7 8 9 10; do curl -sf -o /dev/null "$(SAMPLER_URL)/" && break; sleep 0.5; done; \
+	fi; \
+	node scripts/archaeology/sampler-screenshot.mjs "$(REPO)" "$(THEME)"; RC=$$?; \
+	[ -n "$$STARTED" ] && kill $$STARTED; exit $$RC

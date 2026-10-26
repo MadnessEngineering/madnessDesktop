@@ -124,7 +124,7 @@ The preload sampler shows exactly what would be injected for any repo, next
 to the other ways of feeding context, with token costs:
 
 ```sh
-node scripts/archaeology/preload-sampler.mjs   # then open http://127.0.0.1:4747
+make sampler   # starts it (or reuses a running one) and opens http://127.0.0.1:4747
 ```
 
 ![The preload sampler in the Mad Laboratory theme, comparing four context paths for madnessDesktop, with measured token counts](assets/preload-sampler.png)
@@ -138,5 +138,6 @@ roughly 10,500 input tokens over a 30-turn session, most of it served from
 the prompt cache. The theme picker uses the same MadnessThemes palettes as
 the app.
 
-To re-shoot this screenshot, run the sampler, then
-`node scripts/archaeology/sampler-screenshot.mjs [repo] [theme]`.
+To re-shoot this screenshot, run `make sampler-shot` (add
+`REPO=Omnispindle THEME=terminal` to pick another repo or palette). It starts
+a temporary sampler if none is running.
