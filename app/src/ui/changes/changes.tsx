@@ -14,6 +14,7 @@ import {
   IDiff,
   ImageDiffType,
   ITextDiff,
+  ISubmoduleDiff,
 } from '../../models/diff'
 import {
   AppFileStatusKind,
@@ -28,6 +29,8 @@ import { Button } from '../lib/button'
 import { TextArea } from '../lib/text-area'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
+import { AgentLaunchTarget } from '../../lib/agent-review'
+import { launchSubmoduleReview } from '../diff/submodule-review'
 
 interface IChangesProps {
   readonly repository: Repository
@@ -172,6 +175,22 @@ export class Changes extends React.Component<IChangesProps, IChangesState> {
 
   private onSubmoduleCommitted = () => {
     this.props.dispatcher.refreshRepository(this.props.repository)
+  }
+
+  private onLaunchSubmoduleReview = (
+    diff: ISubmoduleDiff,
+    commitCount: number,
+    ask: string,
+    target: AgentLaunchTarget
+  ) => {
+    launchSubmoduleReview(
+      this.props.dispatcher,
+      this.props.repository,
+      diff,
+      commitCount,
+      ask,
+      target
+    )
   }
 
   private onDiscardChanges = (
@@ -413,6 +432,7 @@ export class Changes extends React.Component<IChangesProps, IChangesState> {
         onSyncSubmodule={this.props.onSyncSubmodule}
         onRollbackSubmodule={this.props.onRollbackSubmodule}
         onSubmoduleCommitted={this.onSubmoduleCommitted}
+        onLaunchSubmoduleReview={this.onLaunchSubmoduleReview}
         onOpenInExternalEditor={path =>
           this.props.dispatcher.openInExternalEditor(path)
         }

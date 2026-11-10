@@ -5,7 +5,7 @@ import * as Path from 'path'
 import { Repository } from '../../models/repository'
 import { CommittedFileChange } from '../../models/status'
 import { Commit } from '../../models/commit'
-import { IDiff, ImageDiffType } from '../../models/diff'
+import { IDiff, ImageDiffType, ISubmoduleDiff } from '../../models/diff'
 
 import { encodePathAsUrl } from '../../lib/path'
 import { revealInFileManager } from '../../lib/app-shell'
@@ -22,6 +22,8 @@ import {
 import { ThrottledScheduler } from '../lib/throttled-scheduler'
 
 import { Dispatcher } from '../dispatcher'
+import { AgentLaunchTarget } from '../../lib/agent-review'
+import { launchSubmoduleReview } from '../diff/submodule-review'
 import { Resizable } from '../resizable'
 import { showContextualMenu } from '../../lib/menu-item'
 
@@ -217,6 +219,7 @@ export class SelectedCommits extends React.Component<
           onChangeImageDiffType={this.props.onChangeImageDiffType}
           onHideWhitespaceInDiffChanged={this.onHideWhitespaceInDiffChanged}
           onOpenSubmodule={this.props.onOpenSubmodule}
+          onLaunchSubmoduleReview={this.onLaunchSubmoduleReview}
           onOpenInExternalEditor={path =>
             this.props.dispatcher.openInExternalEditor(path)
           }
@@ -288,6 +291,22 @@ export class SelectedCommits extends React.Component<
       hideWhitespaceInDiff,
       this.props.repository,
       this.props.selectedFile as CommittedFileChange
+    )
+  }
+
+  private onLaunchSubmoduleReview = (
+    diff: ISubmoduleDiff,
+    commitCount: number,
+    ask: string,
+    target: AgentLaunchTarget
+  ) => {
+    launchSubmoduleReview(
+      this.props.dispatcher,
+      this.props.repository,
+      diff,
+      commitCount,
+      ask,
+      target
     )
   }
 

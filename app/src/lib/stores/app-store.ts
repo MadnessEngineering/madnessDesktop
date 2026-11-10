@@ -502,7 +502,13 @@ import {
   setRemotePolicy,
 } from '../git/remote-policy'
 import { Disposable } from 'event-kit'
-import { ITerminalCommandRequest, isTypeable } from '../../ui/terminal-command'
+import {
+  ITerminalCommandRequest,
+  isTypeable,
+  shellQuote,
+} from '../../ui/terminal-command'
+import { AgentLaunchTarget } from '../agent-review'
+import { openShellomancyTab, ShellomancyError } from '../shellomancy'
 
 const LastSelectedRepositoryIDKey = 'last-selected-repository-id'
 
@@ -8752,6 +8758,50 @@ export class AppStore extends TypedBaseStore<IAppState> {
       label,
     }
     this.emitter.emit('terminal-command-requested', request)
+  }
+
+  /**
+   * Start an agent session (e.g. `claude '<prompt>'`) in `cwd`, either in a
+   * Shellomancy tab or in a new integrated-terminal tab of the repository.
+   * When Shellomancy can't take it, the session opens in the integrated
+   * terminal instead and the reason is reported.
+   */
+  public async _launchAgentSession(
+    repository: Repository,
+    options: {
+      readonly cwd: string
+      readonly command: string
+      readonly label: string
+      readonly target: AgentLaunchTarget
+    }
+  ): Promise<void> {
+    const { cwd, command, label, target } = options
+
+    if (target === AgentLaunchTarget.Shellomancy) {
+      try {
+        await openShellomancyTab({ command, cwd, title: label, color: 'cyan' })
+        return
+      } catch (e) {
+        const reason =
+          e instanceof ShellomancyError && e.code === 'not_installed'
+            ? "Shellomancy's CLI wasn't found"
+            : e instanceof ShellomancyError && e.code === 'no_instance'
+            ? "Shellomancy isn't running"
+            : `Shellomancy refused the tab (${
+                e instanceof ShellomancyError ? e.code : String(e)
+              })`
+        log.warn(`Agent session fell back to the integrated terminal`, e)
+        this.emitError(
+          new Error(`${reason}, so it opened in the built-in terminal instead.`)
+        )
+      }
+    }
+
+    this._runInTerminal(
+      repository,
+      cwd === repository.path ? command : `cd ${shellQuote(cwd)} && ${command}`,
+      label
+    )
   }
 
   /** Open a path to a repository or file using the user's configured editor */

@@ -31,6 +31,7 @@ import { BinaryFile } from './binary-file'
 import { SideBySideDiff } from './side-by-side-diff'
 import { IFileContents } from './syntax-highlighting'
 import { SubmoduleDiff } from './submodule-diff'
+import { LaunchSubmoduleReview } from '../../lib/agent-review'
 import { Octicon } from '../octicons'
 import * as OcticonSymbol from '../octicons/octicons.generated'
 
@@ -105,6 +106,9 @@ interface IDiffProps {
 
   /** Called after a commit is made inside the submodule's inline commit form. */
   readonly onSubmoduleCommitted?: () => void
+
+  /** Called when the user asks an agent to review a submodule's commits. */
+  readonly onLaunchSubmoduleReview?: LaunchSubmoduleReview
 
   /**
    * Called when the user is viewing an image diff and requests
@@ -289,6 +293,7 @@ export class Diff extends React.Component<IDiffProps, IDiffState> {
         onSyncSubmodule={this.props.onSyncSubmodule}
         onRollbackSubmodule={this.props.onRollbackSubmodule}
         onSubmoduleCommitted={this.props.onSubmoduleCommitted}
+        onLaunchSubmoduleReview={this.props.onLaunchSubmoduleReview}
         onOpenInExternalEditor={this.props.onOpenInExternalEditor}
         externalEditorLabel={this.props.externalEditorLabel}
         diff={diff}

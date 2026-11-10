@@ -21,6 +21,7 @@ import { getFileContents, IFileContents } from './syntax-highlighting'
 import { getTextDiffWithBottomDummyHunk } from './text-diff-expansion'
 import { textDiffEquals } from './diff-helpers'
 import noop from 'lodash/noop'
+import { LaunchSubmoduleReview } from '../../lib/agent-review'
 
 /**
  * The time (in milliseconds) we allow when loading a diff before
@@ -120,6 +121,10 @@ interface ISeamlessDiffSwitcherProps {
   /** Called after a commit is made inside the submodule's inline commit form. */
   // eslint-disable-next-line react/no-unused-prop-types
   readonly onSubmoduleCommitted?: () => void
+
+  /** Called when the user asks an agent to review a submodule's commits. */
+  // eslint-disable-next-line react/no-unused-prop-types
+  readonly onLaunchSubmoduleReview?: LaunchSubmoduleReview
 
   /**
    * Called when the user requests to open a file in an external editor.
@@ -408,6 +413,7 @@ export class SeamlessDiffSwitcher extends React.Component<
       onSyncSubmodule,
       onRollbackSubmodule,
       onSubmoduleCommitted,
+      onLaunchSubmoduleReview,
       onOpenInExternalEditor,
       externalEditorLabel,
       onChangeImageDiffType,
@@ -455,6 +461,9 @@ export class SeamlessDiffSwitcher extends React.Component<
             }
             onSubmoduleCommitted={
               isLoadingDiff ? undefined : onSubmoduleCommitted
+            }
+            onLaunchSubmoduleReview={
+              isLoadingDiff ? undefined : onLaunchSubmoduleReview
             }
             onOpenInExternalEditor={
               isLoadingDiff ? noop : onOpenInExternalEditor ?? noop

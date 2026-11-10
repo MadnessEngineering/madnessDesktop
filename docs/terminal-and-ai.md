@@ -28,6 +28,27 @@ file (the first of `~/.aliases`, `~/.zsh_aliases`, or `~/.bash_aliases` that
 exists), and the current repository's `.git/config`. Unsaved edits survive
 switching tabs; a file that doesn't exist yet is created when you save.
 
+### Ask an agent about a submodule bump
+
+A submodule's diff page (in Changes, or a commit in History) lists the
+commits the bump brings in. Under that list is a one-line bar. Type a
+question and press **Enter** or **Review ✦**, and a new `claude` session
+opens in the submodule's folder. Its opening prompt names the submodule,
+the parent repository and the full `old..new` range, and tells it to start
+with `git log --stat` and `git diff` over that range. Leave the bar empty
+to ask for a general review.
+
+- **Where it opens:** the **Terminal | Shellomancy** toggle picks a new
+  integrated-terminal tab (`review ✦ <submodule>`) or a cyan Shellomancy
+  tab. The pick is remembered on this machine.
+- **Shellomancy unavailable:** if its CLI isn't found (`/Applications`,
+  `~/Applications`, `~/.local/bin`, `/usr/local/bin`, `/opt/homebrew/bin`),
+  the app isn't running, or it refuses the tab, the session opens in the
+  integrated terminal instead and an error says why.
+- **Limits:** the question is flattened to one line and capped at 700
+  characters, which keeps the command under Shellomancy's 4096-byte limit.
+  The bar only shows when both SHAs are known and the range has commits.
+
 ## Local AI
 
 Commit messages and diff explanations from a model running on your own

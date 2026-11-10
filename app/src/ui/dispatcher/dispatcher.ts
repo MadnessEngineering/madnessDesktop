@@ -146,6 +146,7 @@ import {
 } from '../../lib/copilot-conflict-resolution'
 import { WorktreeEntry } from '../../models/worktree'
 import { RemoteAllowList } from '../../models/remote-policy'
+import { AgentLaunchTarget } from '../../lib/agent-review'
 
 /**
  * An error handler function.
@@ -1756,6 +1757,22 @@ export class Dispatcher {
     label: string
   ): void {
     this.appStore._runInTerminal(repository, command, label)
+  }
+
+  /**
+   * Start an agent session in `cwd`, in a Shellomancy tab or the
+   * repository's integrated terminal.
+   */
+  public launchAgentSession(
+    repository: Repository,
+    options: {
+      readonly cwd: string
+      readonly command: string
+      readonly label: string
+      readonly target: AgentLaunchTarget
+    }
+  ): Promise<void> {
+    return this.appStore._launchAgentSession(repository, options)
   }
 
   /**

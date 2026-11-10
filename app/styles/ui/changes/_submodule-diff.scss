@@ -27,6 +27,7 @@
         color: var(--color-new);
       }
 
+      &.removed-icon,
       &.deleted-icon {
         color: var(--color-deleted);
       }
@@ -52,6 +53,46 @@
 
     :hover {
       color: var(--text-secondary-color);
+    }
+  }
+
+  // Ask-an-agent bar under the commit list
+  .submodule-review-bar {
+    .submodule-review-content {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: var(--spacing-half);
+    }
+
+    .submodule-review-input {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .submodule-review-target {
+      display: flex;
+
+      .button-component {
+        border-radius: 0;
+
+        &:first-child {
+          border-top-left-radius: var(--border-radius);
+          border-bottom-left-radius: var(--border-radius);
+        }
+
+        &:last-child {
+          border-top-right-radius: var(--border-radius);
+          border-bottom-right-radius: var(--border-radius);
+          margin-left: -1px;
+        }
+
+        &.selected {
+          background-color: var(--box-selected-active-background-color);
+          color: var(--box-selected-active-text-color);
+          border-color: var(--box-selected-active-border-color);
+        }
+      }
     }
   }
 
