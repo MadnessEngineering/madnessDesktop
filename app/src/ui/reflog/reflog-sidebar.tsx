@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { clipboard } from 'electron'
+import { writeClipboardText } from '../main-process-proxy'
 import { IReflogEntry } from '../../models/reflog-entry'
 import { IActivityLogEntry } from '../../models/activity-log'
 import { loadActivityLog, clearActivityLog } from '../../lib/activity-log'
@@ -137,7 +137,7 @@ export class ReflogSidebar extends React.Component<
         { type: 'separator' },
         {
           label: 'Copy SHA',
-          action: () => clipboard.writeText(entry.sha),
+          action: () => writeClipboardText(entry.sha),
         },
       ]
       showContextualMenu(items)

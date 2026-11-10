@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { extname, join, normalize } from 'path'
-import { clipboard } from 'electron'
+import { writeClipboardText } from '../main-process-proxy'
 import classNames from 'classnames'
 import memoizeOne from 'memoize-one'
 
@@ -716,11 +716,11 @@ export class ExplodedView extends React.Component<
       },
       {
         label: CopyFilePathLabel,
-        action: () => clipboard.writeText(fullPath),
+        action: () => writeClipboardText(fullPath),
       },
       {
         label: CopyRelativeFilePathLabel,
-        action: () => clipboard.writeText(normalize(file.path)),
+        action: () => writeClipboardText(normalize(file.path)),
       },
     ]
 

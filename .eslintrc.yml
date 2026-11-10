@@ -180,6 +180,11 @@ rules:
           message:
             "Please use 'import * as ipcMain' from 'ipc-main' instead to get
             strongly typed IPC methods."
+        - name: electron
+          importNames: ['clipboard']
+          message:
+            "clipboard is undefined in the renderer since Electron 44. Use
+            writeClipboardText from 'ui/main-process-proxy' instead."
 
   ###########
   # SPECIAL #

@@ -4,6 +4,8 @@ import {
   app,
   Menu,
   BrowserWindow,
+  // The clipboard import ban is for the renderer; the main process owns it.
+  // eslint-disable-next-line no-restricted-imports
   clipboard,
   dialog,
   shell,

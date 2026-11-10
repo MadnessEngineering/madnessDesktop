@@ -35,7 +35,7 @@ import {
   isSafeFileExtension,
 } from '../lib/context-menu'
 import { checkoutPaths } from '../../lib/git/checkout'
-import { clipboard } from 'electron'
+import { writeClipboardText } from '../main-process-proxy'
 import * as Path from 'path'
 import * as FS from 'fs'
 import {
@@ -48,6 +48,8 @@ import {
   ILocalAICommitContext,
 } from '../../lib/local-ai-commit-message'
 import { ILocalAIConfig } from '../../models/local-ai'
+import { AgentLaunchTarget } from '../../lib/agent-review'
+import { SubmoduleReviewBar } from './submodule-review-bar'
 
 type SubmoduleItemIcon =
   | {
@@ -83,6 +85,16 @@ interface ISubmoduleDiffProps {
    * updated gitlink for staging.
    */
   readonly onSubmoduleCommitted?: () => void
+
+  /**
+   * Start an agent session in the submodule to review the commits between
+   * the old and new SHA. Omitted where the review bar shouldn't show.
+   */
+  readonly onLaunchSubmoduleReview?: (
+    diff: ISubmoduleDiff,
+    ask: string,
+    target: AgentLaunchTarget
+  ) => void
   readonly onOpenInExternalEditor: (fullPath: string) => void
   readonly externalEditorLabel?: string
   readonly diff: ISubmoduleDiff
@@ -341,6 +353,7 @@ export class SubmoduleDiff extends React.Component<
           {this.renderSubmoduleInfo()}
           {this.renderCommitChangeInfo()}
           {this.renderCommitHistory()}
+          {this.renderReviewBar()}
           {this.renderSubmodulesChangesInfo()}
           {this.renderInlineChanges()}
           {this.renderQuickActions()}
@@ -440,6 +453,30 @@ export class SubmoduleDiff extends React.Component<
         </div>
       </div>
     )
+  }
+
+  private renderReviewBar() {
+    const { diff, onLaunchSubmoduleReview } = this.props
+    const { commits } = this.state
+    if (
+      onLaunchSubmoduleReview === undefined ||
+      diff.oldSHA === null ||
+      diff.newSHA === null ||
+      commits.length === 0
+    ) {
+      return null
+    }
+
+    return (
+      <SubmoduleReviewBar
+        commitCount={commits.length}
+        onLaunch={this.onLaunchReview}
+      />
+    )
+  }
+
+  private onLaunchReview = (ask: string, target: AgentLaunchTarget) => {
+    this.props.onLaunchSubmoduleReview?.(this.props.diff, ask, target)
   }
 
   private renderCommitSHA(sha: string, which?: 'previous' | 'new') {
@@ -829,11 +866,11 @@ export class SubmoduleDiff extends React.Component<
       {
         label: __DARWIN__ ? 'Copy Path' : 'Copy path',
         action: () =>
-          clipboard.writeText(Path.join(this.props.diff.fullPath, path)),
+          writeClipboardText(Path.join(this.props.diff.fullPath, path)),
       },
       {
         label: __DARWIN__ ? 'Copy Relative Path' : 'Copy relative path',
-        action: () => clipboard.writeText(Path.normalize(path)),
+        action: () => writeClipboardText(Path.normalize(path)),
       },
       { type: 'separator' },
       {
