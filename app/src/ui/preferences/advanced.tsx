@@ -12,6 +12,8 @@ import {
   IChatHistoryArchiveLogEntry,
 } from '../../models/chat-history-archive'
 import { loadArchiveLog, clearArchiveLog } from '../../lib/chat-history-archive'
+import { IAutoIgnoreConfig } from '../../models/auto-ignore'
+import { isValidStandardPattern } from '../../lib/auto-ignore'
 
 interface IAdvancedPreferencesProps {
   readonly useWindowsOpenSSH: boolean
@@ -43,6 +45,8 @@ interface IAdvancedPreferencesProps {
   readonly onChatHistoryArchiveConfigChanged: (
     config: IChatHistoryArchiveConfig
   ) => void
+  readonly autoIgnoreConfig: IAutoIgnoreConfig
+  readonly onAutoIgnoreConfigChanged: (config: IAutoIgnoreConfig) => void
 }
 
 interface IAdvancedPreferencesState {
@@ -50,6 +54,8 @@ interface IAdvancedPreferencesState {
   readonly canUseWindowsSSH: boolean
   readonly useExternalCredentialHelper: boolean
   readonly archiveLog: ReadonlyArray<IChatHistoryArchiveLogEntry>
+  /** Raw pattern text, parsed into the config as it's typed. */
+  readonly autoIgnorePatternsText: string
 }
 
 export class Advanced extends React.Component<
@@ -64,6 +70,7 @@ export class Advanced extends React.Component<
       canUseWindowsSSH: false,
       useExternalCredentialHelper: this.props.useExternalCredentialHelper,
       archiveLog: [],
+      autoIgnorePatternsText: this.props.autoIgnoreConfig.patterns.join(', '),
     }
   }
 
@@ -335,8 +342,89 @@ export class Advanced extends React.Component<
             </p>
           </div>
         </div>
+        {this.renderAutoIgnore()}
         {this.renderChatHistoryArchive()}
       </DialogContent>
+    )
+  }
+
+  // ─── Auto-ignore (standard practice) ───────────────────────────────────────
+
+  private onAutoIgnoreEnabledChanged = (
+    e: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onAutoIgnoreConfigChanged({
+      ...this.props.autoIgnoreConfig,
+      enabled: (e.currentTarget as HTMLInputElement).checked,
+    })
+  }
+
+  private onAutoIgnorePatternsChanged = (autoIgnorePatternsText: string) => {
+    this.setState({ autoIgnorePatternsText })
+    const patterns = autoIgnorePatternsText
+      .split(',')
+      .map(s => s.trim())
+      .filter(isValidStandardPattern)
+    this.props.onAutoIgnoreConfigChanged({
+      ...this.props.autoIgnoreConfig,
+      patterns: [...new Set(patterns)],
+    })
+  }
+
+  private onAutoIgnoreCommitMessageChanged = (commitMessage: string) => {
+    this.props.onAutoIgnoreConfigChanged({
+      ...this.props.autoIgnoreConfig,
+      commitMessage,
+    })
+  }
+
+  private renderAutoIgnore() {
+    const { autoIgnoreConfig: config } = this.props
+    const disabled = !config.enabled
+    const invalid = this.state.autoIgnorePatternsText
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !isValidStandardPattern(s))
+
+    return (
+      <div className="advanced-section">
+        <h2>Standard Ignore Patterns</h2>
+        <p className="git-settings-description">
+          When a repository's only changes are untracked files matching these
+          patterns, add the pattern to its root .gitignore and commit that file
+          on its own. Repositories with any other changes are left alone. Add
+          patterns from a file's context menu with "Always ignore".
+        </p>
+
+        <Checkbox
+          label="Auto-ignore and commit standard patterns"
+          value={config.enabled ? CheckboxValue.On : CheckboxValue.Off}
+          onChange={this.onAutoIgnoreEnabledChanged}
+        />
+
+        <TextBox
+          label="Patterns (comma separated)"
+          value={this.state.autoIgnorePatternsText}
+          onValueChanged={this.onAutoIgnorePatternsChanged}
+          placeholder=".claude_temp/, *.log"
+          disabled={disabled}
+        />
+        {invalid.length > 0 && (
+          <p className="git-settings-description">
+            Skipped {invalid.join(', ')}: only single names like{' '}
+            <code>name/</code>, <code>name</code> or <code>*.ext</code> (no
+            slashes inside, no <code>!</code>).
+          </p>
+        )}
+
+        <TextBox
+          label="Commit message"
+          value={config.commitMessage}
+          onValueChanged={this.onAutoIgnoreCommitMessageChanged}
+          placeholder="chore(gitignore): auto-ignore {patterns}"
+          disabled={disabled}
+        />
+      </div>
     )
   }
 

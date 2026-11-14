@@ -96,6 +96,7 @@ import {
 } from './collapsed-folders-store'
 import { HookProgress } from '../../lib/git'
 import { formatNumber } from '../../lib/format-number'
+import { suggestStandardPatterns } from '../../lib/auto-ignore'
 
 const RowHeight = 29
 const StashIcon: OcticonSymbolVariant = {
@@ -875,6 +876,31 @@ export class FilterChangesList extends React.Component<
     showContextualMenu(items)
   }
 
+  /**
+   * Make a pattern standard practice: added to the auto-ignore list, then
+   * any repo whose only changes it covers gets it ignored and committed.
+   */
+  private getAlwaysIgnoreMenuItem(path: string): IMenuItem {
+    const { patterns, enabled } = this.props.dispatcher.getAutoIgnoreConfig()
+    return {
+      label: __DARWIN__
+        ? 'Always Ignore (Standard Practice)'
+        : 'Always ignore (standard practice)',
+      submenu: suggestStandardPatterns(path).map(pattern => {
+        const isStandard = enabled && patterns.includes(pattern)
+        return {
+          label: isStandard ? `${pattern} (already standard)` : pattern,
+          action: () =>
+            this.props.dispatcher.addAutoIgnorePattern(
+              this.props.repository,
+              pattern
+            ),
+          enabled: !isStandard,
+        }
+      }),
+    }
+  }
+
   private getDiscardChangesMenuItem = (
     paths: ReadonlyArray<string>
   ): IMenuItem => {
@@ -1061,6 +1087,10 @@ export class FilterChangesList extends React.Component<
             enabled,
           })
         }
+      }
+
+      if (enabled && file.status.kind === AppFileStatusKind.Untracked) {
+        items.push(this.getAlwaysIgnoreMenuItem(path))
       }
     } else if (paths.length > 1) {
       // Filter out any .gitignores that happens to be selected, ignoring

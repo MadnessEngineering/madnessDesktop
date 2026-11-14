@@ -57,6 +57,10 @@ import {
   IChatHistoryArchiveConfig,
   DefaultChatHistoryArchiveConfig,
 } from '../../models/chat-history-archive'
+import {
+  IAutoIgnoreConfig,
+  DefaultAutoIgnoreConfig,
+} from '../../models/auto-ignore'
 import { CopilotPreferences } from './copilot'
 import type {
   CopilotFeature,
@@ -147,6 +151,7 @@ interface IPreferencesProps {
   readonly mqttConfig: IMqttConfig
   readonly localAIConfig: ILocalAIConfig
   readonly chatHistoryArchiveConfig: IChatHistoryArchiveConfig
+  readonly autoIgnoreConfig: IAutoIgnoreConfig
   readonly onEditGlobalGitConfig: () => void
   readonly underlineLinks: boolean
   readonly showDiffCheckMarks: boolean
@@ -214,6 +219,7 @@ interface IPreferencesState {
   readonly mqttConfig: IMqttConfig
   readonly localAIConfig: ILocalAIConfig
   readonly chatHistoryArchiveConfig: IChatHistoryArchiveConfig
+  readonly autoIgnoreConfig: IAutoIgnoreConfig
 
   readonly initiallySelectedTheme: ApplicationTheme
   readonly initiallySelectedTabSize: number
@@ -324,6 +330,7 @@ export class Preferences extends React.Component<
       localAIConfig: this.props.localAIConfig ?? DefaultLocalAIConfig,
       chatHistoryArchiveConfig:
         this.props.chatHistoryArchiveConfig ?? DefaultChatHistoryArchiveConfig,
+      autoIgnoreConfig: this.props.autoIgnoreConfig ?? DefaultAutoIgnoreConfig,
       initiallySelectedTheme: this.props.selectedTheme,
       initiallySelectedTabSize: this.props.selectedTabSize,
       alwaysShowWorktreeList: this.props.alwaysShowWorktreeList,
@@ -901,6 +908,8 @@ export class Preferences extends React.Component<
             onChatHistoryArchiveConfigChanged={
               this.onChatHistoryArchiveConfigChanged
             }
+            autoIgnoreConfig={this.state.autoIgnoreConfig}
+            onAutoIgnoreConfigChanged={this.onAutoIgnoreConfigChanged}
           />
         )
         break
@@ -1000,6 +1009,10 @@ export class Preferences extends React.Component<
     chatHistoryArchiveConfig: IChatHistoryArchiveConfig
   ) => {
     this.setState({ chatHistoryArchiveConfig })
+  }
+
+  private onAutoIgnoreConfigChanged = (autoIgnoreConfig: IAutoIgnoreConfig) => {
+    this.setState({ autoIgnoreConfig })
   }
 
   private onLockFileDeleted = () => {
@@ -1337,6 +1350,10 @@ export class Preferences extends React.Component<
         dispatcher.setChatHistoryArchiveConfig(
           this.state.chatHistoryArchiveConfig
         )
+      }
+
+      if (this.props.autoIgnoreConfig !== this.state.autoIgnoreConfig) {
+        dispatcher.setAutoIgnoreConfig(this.state.autoIgnoreConfig)
       }
 
       if (this.state.hooksPreferencesDirty) {

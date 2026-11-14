@@ -2109,6 +2109,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             mqttConfig={this.state.mqttConfig}
             localAIConfig={this.state.localAIConfig}
             chatHistoryArchiveConfig={this.state.chatHistoryArchiveConfig}
+            autoIgnoreConfig={this.state.autoIgnoreConfig}
             onEditGlobalGitConfig={this.editGlobalGitConfig}
             underlineLinks={this.state.underlineLinks}
             showDiffCheckMarks={this.state.showDiffCheckMarks}
