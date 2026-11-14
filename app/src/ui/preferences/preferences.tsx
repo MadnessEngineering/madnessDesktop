@@ -47,6 +47,7 @@ import { Prompts } from './prompts'
 import { Repository } from '../../models/repository'
 import { AutomationHooksPreferences } from './automation-hooks'
 import { ClaudeCodePreferences } from './claude-code'
+import { AutoIgnorePreferences } from './auto-ignore'
 import { AIServicesPreferences } from './ai-services'
 import { Keybindings } from './keybindings'
 import { MqttPreferences } from './mqtt'
@@ -525,6 +526,10 @@ export class Preferences extends React.Component<
               <Octicon className="icon" symbol={octicons.rocket} />
               Claude Code
             </span>
+            <span id={this.getTabId(PreferencesTab.AutoIgnore)}>
+              <Octicon className="icon" symbol={octicons.eyeClosed} />
+              Auto-Ignore
+            </span>
           </TabBar>
 
           {this.renderActiveTab()}
@@ -572,6 +577,9 @@ export class Preferences extends React.Component<
         break
       case PreferencesTab.ClaudeCode:
         suffix = 'claude-code'
+        break
+      case PreferencesTab.AutoIgnore:
+        suffix = 'auto-ignore'
         break
       default:
         return assertNever(tab, `Unknown tab type: ${tab}`)
@@ -908,14 +916,20 @@ export class Preferences extends React.Component<
             onChatHistoryArchiveConfigChanged={
               this.onChatHistoryArchiveConfigChanged
             }
-            autoIgnoreConfig={this.state.autoIgnoreConfig}
-            onAutoIgnoreConfigChanged={this.onAutoIgnoreConfigChanged}
           />
         )
         break
       }
       case PreferencesTab.ClaudeCode:
         View = <ClaudeCodePreferences />
+        break
+      case PreferencesTab.AutoIgnore:
+        View = (
+          <AutoIgnorePreferences
+            config={this.state.autoIgnoreConfig}
+            onConfigChanged={this.onAutoIgnoreConfigChanged}
+          />
+        )
         break
       default:
         return assertNever(index, `Unknown tab index: ${index}`)

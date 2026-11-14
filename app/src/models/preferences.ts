@@ -11,4 +11,5 @@ export enum PreferencesTab {
   Keybindings,
   Advanced,
   ClaudeCode,
+  AutoIgnore,
 }

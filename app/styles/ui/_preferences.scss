@@ -613,6 +613,108 @@
     }
   }
 
+  .auto-ignore-preferences {
+    .auto-ignore-section {
+      margin-bottom: var(--spacing-double);
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      h2 {
+        margin-top: 0;
+        margin-bottom: var(--spacing-half);
+      }
+    }
+
+    .auto-ignore-description,
+    .auto-ignore-empty {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary-color);
+      margin: 0 0 var(--spacing) 0;
+      line-height: 1.5;
+    }
+
+    .auto-ignore-patterns,
+    .auto-ignore-log {
+      list-style: none;
+      margin: 0 0 var(--spacing) 0;
+      padding: 0;
+      border: 1px solid var(--box-border-color);
+      border-radius: var(--border-radius);
+      max-height: 200px;
+      overflow: auto;
+
+      li {
+        padding: var(--spacing-half) var(--spacing);
+
+        & + li {
+          border-top: 1px solid var(--box-border-color);
+        }
+      }
+    }
+
+    .auto-ignore-patterns li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing);
+    }
+
+    .auto-ignore-add-row {
+      display: flex;
+      align-items: flex-end;
+      gap: var(--spacing-half);
+
+      > .text-box-component {
+        flex: 1;
+      }
+    }
+
+    .auto-ignore-error,
+    .auto-ignore-test-result {
+      font-size: var(--font-size-sm);
+      margin: var(--spacing-half) 0 0 0;
+    }
+
+    .auto-ignore-error,
+    .auto-ignore-test-result.miss {
+      color: var(--error-color, #d73a49);
+    }
+
+    .auto-ignore-test-result.hit {
+      color: var(--color-ansi-green, #28a745);
+    }
+
+    .auto-ignore-test {
+      margin-top: var(--spacing);
+    }
+
+    .auto-ignore-log {
+      font-size: var(--font-size-sm);
+
+      .auto-ignore-log-outcome {
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        font-size: 10px;
+        letter-spacing: 0.04em;
+      }
+
+      .outcome-committed .auto-ignore-log-outcome {
+        color: var(--color-ansi-green, #28a745);
+      }
+
+      .outcome-failed .auto-ignore-log-outcome {
+        color: var(--error-color, #d73a49);
+      }
+
+      .auto-ignore-log-detail,
+      .auto-ignore-log-time {
+        color: var(--text-secondary-color);
+      }
+    }
+  }
+
   .mqtt-preferences {
     .mqtt-section {
       margin-bottom: var(--spacing-double);

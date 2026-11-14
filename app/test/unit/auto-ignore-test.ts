@@ -3,6 +3,7 @@ import assert from 'node:assert'
 
 import {
   findLoneAutoIgnoreMatch,
+  formatAutoIgnoreCommitMessage,
   isValidStandardPattern,
   matchStandardPattern,
   patternsMissingFrom,
@@ -152,6 +153,25 @@ describe('auto-ignore', () => {
 
     it('skips the extension glob for dotfiles', () => {
       assert.deepStrictEqual(suggestStandardPatterns('.envrc'), ['.envrc'])
+    })
+  })
+
+  describe('formatAutoIgnoreCommitMessage', () => {
+    it('fills every {patterns} slot', () => {
+      assert.strictEqual(
+        formatAutoIgnoreCommitMessage('ignore {patterns} ({patterns})', [
+          'a/',
+          '*.log',
+        ]),
+        'ignore a/, *.log (a/, *.log)'
+      )
+    })
+
+    it('falls back to the default when the template is blank', () => {
+      assert.strictEqual(
+        formatAutoIgnoreCommitMessage('  ', ['.claude_temp/']),
+        'chore(gitignore): auto-ignore .claude_temp/'
+      )
     })
   })
 })

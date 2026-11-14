@@ -408,9 +408,15 @@ import {
 import {
   IAutoIgnoreConfig,
   AutoIgnoreConfigKey,
+  AutoIgnoreOutcome,
   DefaultAutoIgnoreConfig,
 } from '../../models/auto-ignore'
-import { findLoneAutoIgnoreMatch, patternsMissingFrom } from '../auto-ignore'
+import {
+  findLoneAutoIgnoreMatch,
+  formatAutoIgnoreCommitMessage,
+  patternsMissingFrom,
+} from '../auto-ignore'
+import { appendAutoIgnoreLog } from '../auto-ignore-log'
 import { isAttributableEmailFor } from '../email'
 import { TrashNameLabel } from '../../ui/lib/context-menu'
 import { clearCollapsedFolders } from '../../ui/changes/collapsed-folders-store'
@@ -3479,56 +3485,83 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.autoIgnoreAttempted.add(signature)
     this.autoIgnoreInFlight.add(repository.id)
 
+    const record = (
+      outcome: AutoIgnoreOutcome,
+      patterns: ReadonlyArray<string>,
+      detail?: string,
+      sha?: string
+    ) => {
+      const line = `[auto-ignore] ${
+        repository.name
+      }: ${outcome} ${patterns.join(', ')}${sha ? ` (${sha})` : ''}${
+        detail ? ` - ${detail}` : ''
+      }`
+      if (outcome === 'failed') {
+        log.error(line)
+      } else {
+        log.info(line)
+      }
+      appendAutoIgnoreLog({
+        timestamp: Date.now(),
+        repository: repository.name,
+        patterns,
+        outcome,
+        sha,
+        detail,
+      })
+    }
+
     try {
       const current = (await readGitIgnoreAtRoot(repository)) ?? ''
       const missing = patternsMissingFrom(current, matched)
       if (missing.length === 0) {
         // Covered already (e.g. by a nested .gitignore we don't parse) but
         // still showing up; nothing sensible to add.
-        log.info(
-          `[auto-ignore] ${repository.name}: ${matched.join(
-            ', '
-          )} already in .gitignore, skipping`
-        )
+        record('skipped', matched, 'already in .gitignore')
         return
       }
 
       await appendIgnoreRule(repository, [...missing])
 
+      if (!config.autoCommit) {
+        record('appended', missing, 'auto-commit off')
+        return
+      }
+
       const gitStore = this.gitStoreCache.get(repository)
       const after = await gitStore.loadStatus()
       const changes = after?.workingDirectory.files ?? []
       if (changes.length !== 1 || changes[0].path !== '.gitignore') {
-        log.warn(
-          `[auto-ignore] ${
-            repository.name
-          }: expected only .gitignore to change after ignoring ${missing.join(
-            ', '
-          )}; leaving it uncommitted`
+        record(
+          'skipped',
+          missing,
+          'more than .gitignore changed after ignoring; left uncommitted'
         )
         return
       }
 
-      const message = config.commitMessage.replace(
-        '{patterns}',
-        missing.join(', ')
+      const message = formatAutoIgnoreCommitMessage(
+        config.commitMessage,
+        missing
       )
+      if (this.repositoryStateCache.get(repository).isCommitting) {
+        record('skipped', missing, 'another commit in progress')
+        return
+      }
       await this.withIsCommitting(repository, async () => {
         const sha = await gitStore.performFailableOperation(
           () => createCommit(repository, message, changes),
           { gitContext: { kind: 'commit' }, repository }
         )
-        if (sha !== undefined) {
-          log.info(
-            `[auto-ignore] ${repository.name}: committed ${sha} (${missing.join(
-              ', '
-            )})`
-          )
+        if (sha === undefined) {
+          record('failed', missing, 'commit failed; .gitignore left modified')
+        } else {
+          record('committed', missing, undefined, sha)
         }
         return sha !== undefined
       })
     } catch (e) {
-      log.error(`[auto-ignore] ${repository.name} failed`, e)
+      record('failed', matched, e instanceof Error ? e.message : String(e))
     } finally {
       this.autoIgnoreInFlight.delete(repository.id)
       this._refreshRepository(repository)

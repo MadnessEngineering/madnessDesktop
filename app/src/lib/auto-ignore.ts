@@ -120,3 +120,14 @@ export function suggestStandardPatterns(path: string): ReadonlyArray<string> {
 
   return [...new Set(suggestions)].filter(isValidStandardPattern)
 }
+
+/** Fill the `{patterns}` slot of a commit message template. */
+export function formatAutoIgnoreCommitMessage(
+  template: string,
+  patterns: ReadonlyArray<string>
+): string {
+  const message = template.split('{patterns}').join(patterns.join(', ')).trim()
+  return message.length > 0
+    ? message
+    : `chore(gitignore): auto-ignore ${patterns.join(', ')}`
+}
