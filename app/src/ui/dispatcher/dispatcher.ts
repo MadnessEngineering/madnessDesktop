@@ -1291,6 +1291,33 @@ export class Dispatcher {
     return this.appStore._setChatHistoryArchiveConfig(config)
   }
 
+  public setAutoIgnoreConfig(
+    config: import('../../models/auto-ignore').IAutoIgnoreConfig
+  ) {
+    return this.appStore._setAutoIgnoreConfig(null, config)
+  }
+
+  /** Current standard ignore config, read at menu-build time. */
+  public getAutoIgnoreConfig() {
+    return this.appStore.getState().autoIgnoreConfig
+  }
+
+  /**
+   * Make `pattern` a standard ignore pattern (enabling auto-ignore) and
+   * re-check `repository` so a lone match is ignored and committed now.
+   */
+  public addAutoIgnorePattern(repository: Repository, pattern: string) {
+    const { autoIgnoreConfig } = this.appStore.getState()
+    const patterns = autoIgnoreConfig.patterns.includes(pattern)
+      ? autoIgnoreConfig.patterns
+      : [...autoIgnoreConfig.patterns, pattern]
+    return this.appStore._setAutoIgnoreConfig(repository, {
+      ...autoIgnoreConfig,
+      enabled: true,
+      patterns,
+    })
+  }
+
   public archiveChatHistory() {
     return this.appStore._archiveChatHistory()
   }

@@ -498,6 +498,9 @@ export interface IAppState {
   /** Configuration for chat history background archiver */
   readonly chatHistoryArchiveConfig: import('../models/chat-history-archive').IChatHistoryArchiveConfig
 
+  /** Standard ignore patterns that get auto-ignored and committed */
+  readonly autoIgnoreConfig: import('../models/auto-ignore').IAutoIgnoreConfig
+
   /** Account-scoped Copilot model selections. */
   readonly selectedCopilotModelsByAccount: CopilotModelSelectionsByAccount
 

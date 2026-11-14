@@ -234,6 +234,7 @@ import {
   renameBranch,
   saveGitIgnore,
   appendIgnoreRule,
+  readGitIgnoreAtRoot,
   createMergeCommit,
   getBranchesPointedAt,
   abortRebase,
@@ -404,6 +405,12 @@ import {
   ChatHistoryArchiveConfigKey,
   DefaultChatHistoryArchiveConfig,
 } from '../../models/chat-history-archive'
+import {
+  IAutoIgnoreConfig,
+  AutoIgnoreConfigKey,
+  DefaultAutoIgnoreConfig,
+} from '../../models/auto-ignore'
+import { findLoneAutoIgnoreMatch, patternsMissingFrom } from '../auto-ignore'
 import { isAttributableEmailFor } from '../email'
 import { TrashNameLabel } from '../../ui/lib/context-menu'
 import { clearCollapsedFolders } from '../../ui/changes/collapsed-folders-store'
@@ -688,6 +695,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private readonly chatHistoryWatcher: ChatHistoryWatcher
   private chatHistoryArchiveConfig: IChatHistoryArchiveConfig =
     DefaultChatHistoryArchiveConfig
+  private autoIgnoreConfig: IAutoIgnoreConfig = DefaultAutoIgnoreConfig
+  /** Repository ids with an auto-ignore run in progress. */
+  private readonly autoIgnoreInFlight = new Set<number>()
+  /** Repo id + paths already attempted, so a failure doesn't retry forever. */
+  private readonly autoIgnoreAttempted = new Set<string>()
   private autoSwitchOnChangesEnabled = false
   private worktreesEnabled = true
   private madnessModeEnabled = false
@@ -988,6 +1000,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
       if (raw) {
         this.chatHistoryArchiveConfig = {
           ...DefaultChatHistoryArchiveConfig,
+          ...JSON.parse(raw),
+        }
+      }
+    } catch {
+      // keep defaults
+    }
+
+    try {
+      const raw = localStorage.getItem(AutoIgnoreConfigKey)
+      if (raw) {
+        this.autoIgnoreConfig = {
+          ...DefaultAutoIgnoreConfig,
           ...JSON.parse(raw),
         }
       }
@@ -1607,6 +1631,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       mqttConfig: this.mqttConfig,
       localAIConfig: this.localAIConfig,
       chatHistoryArchiveConfig: this.chatHistoryArchiveConfig,
+      autoIgnoreConfig: this.autoIgnoreConfig,
       selectedCopilotModelsByAccount: this.selectedCopilotModelsByAccount,
       copilotModelsByAccount: this.copilotModelsByAccount,
       copilotQuotaSnapshotsByAccount: this.copilotQuotaSnapshotsByAccount,
@@ -3411,7 +3436,103 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.updateChangesWorkingDirectoryDiff(repository)
 
+    this.maybeAutoIgnore(repository, status)
+
     return status
+  }
+
+  /**
+   * When the only changes in a repository are untracked files covered by a
+   * standard ignore pattern, append the pattern(s) to the root .gitignore and
+   * commit that file on its own. Fire-and-forget from `_loadStatus`.
+   */
+  private async maybeAutoIgnore(
+    repository: Repository,
+    status: IStatusResult
+  ): Promise<void> {
+    const config = this.autoIgnoreConfig
+    if (
+      !config.enabled ||
+      this.autoIgnoreInFlight.has(repository.id) ||
+      status.currentBranch === undefined ||
+      status.mergeHeadFound ||
+      status.squashMsgFound ||
+      status.rebaseInternalState !== null ||
+      status.isCherryPickingHeadFound ||
+      status.doConflictedFilesExist
+    ) {
+      return
+    }
+
+    const files = status.workingDirectory.files
+    const matched = findLoneAutoIgnoreMatch(files, config.patterns)
+    if (matched === null) {
+      return
+    }
+
+    const signature = [repository.id, ...files.map(f => f.path).sort()].join(
+      '\0'
+    )
+    if (this.autoIgnoreAttempted.has(signature)) {
+      return
+    }
+    this.autoIgnoreAttempted.add(signature)
+    this.autoIgnoreInFlight.add(repository.id)
+
+    try {
+      const current = (await readGitIgnoreAtRoot(repository)) ?? ''
+      const missing = patternsMissingFrom(current, matched)
+      if (missing.length === 0) {
+        // Covered already (e.g. by a nested .gitignore we don't parse) but
+        // still showing up; nothing sensible to add.
+        log.info(
+          `[auto-ignore] ${repository.name}: ${matched.join(
+            ', '
+          )} already in .gitignore, skipping`
+        )
+        return
+      }
+
+      await appendIgnoreRule(repository, [...missing])
+
+      const gitStore = this.gitStoreCache.get(repository)
+      const after = await gitStore.loadStatus()
+      const changes = after?.workingDirectory.files ?? []
+      if (changes.length !== 1 || changes[0].path !== '.gitignore') {
+        log.warn(
+          `[auto-ignore] ${
+            repository.name
+          }: expected only .gitignore to change after ignoring ${missing.join(
+            ', '
+          )}; leaving it uncommitted`
+        )
+        return
+      }
+
+      const message = config.commitMessage.replace(
+        '{patterns}',
+        missing.join(', ')
+      )
+      await this.withIsCommitting(repository, async () => {
+        const sha = await gitStore.performFailableOperation(
+          () => createCommit(repository, message, changes),
+          { gitContext: { kind: 'commit' }, repository }
+        )
+        if (sha !== undefined) {
+          log.info(
+            `[auto-ignore] ${repository.name}: committed ${sha} (${missing.join(
+              ', '
+            )})`
+          )
+        }
+        return sha !== undefined
+      })
+    } catch (e) {
+      log.error(`[auto-ignore] ${repository.name} failed`, e)
+    } finally {
+      this.autoIgnoreInFlight.delete(repository.id)
+      this._refreshRepository(repository)
+    }
   }
 
   /**
@@ -7371,6 +7492,21 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.localAIConfig = config
     saveLocalAIConfig(config)
     this.emitUpdate()
+  }
+
+  public _setAutoIgnoreConfig(
+    repository: Repository | null,
+    config: IAutoIgnoreConfig
+  ): void {
+    this.autoIgnoreConfig = config
+    localStorage.setItem(AutoIgnoreConfigKey, JSON.stringify(config))
+    // A new pattern deserves a fresh look at changes we already passed on.
+    this.autoIgnoreAttempted.clear()
+    this.emitUpdate()
+
+    if (repository !== null && config.enabled) {
+      this._refreshRepository(repository)
+    }
   }
 
   public _setChatHistoryArchiveConfig(config: IChatHistoryArchiveConfig): void {
