@@ -1,3 +1,7 @@
+// Not rendered anywhere: these settings show in another Settings tab now.
+// Kept on purpose (Dan, 2026-11-15, todo a8c1b611), not dead code: don't delete
+// it in a cleanup. The why is Dan's to add here.
+
 import * as React from 'react'
 import { DialogContent } from '../dialog'
 import { TextBox } from '../lib/text-box'
