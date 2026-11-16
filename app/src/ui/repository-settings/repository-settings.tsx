@@ -34,6 +34,8 @@ import {
 import { Account } from '../../models/account'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
+import { AutoIgnoreRepoSetting } from '../../models/auto-ignore'
+import { autoIgnoreRepoSetting } from '../../lib/auto-ignore'
 
 interface IRepositorySettingsProps {
   readonly initialSelectedTab?: RepositorySettingsTab
@@ -71,6 +73,8 @@ interface IRepositorySettingsState {
   readonly errors?: ReadonlyArray<JSX.Element | string>
   readonly forkContributionTarget: ForkContributionTarget
   readonly isLoadingGitConfig: boolean
+  /** This repository's auto-ignore override, saved with the dialog. */
+  readonly autoIgnoreSetting: AutoIgnoreRepoSetting
 }
 
 export class RepositorySettings extends React.Component<
@@ -98,6 +102,10 @@ export class RepositorySettings extends React.Component<
       initialCommitterName: null,
       initialCommitterEmail: null,
       isLoadingGitConfig: true,
+      autoIgnoreSetting: autoIgnoreRepoSetting(
+        props.dispatcher.getAutoIgnoreConfig(),
+        props.repository.path
+      ),
     }
   }
 
@@ -258,6 +266,11 @@ export class RepositorySettings extends React.Component<
             text={this.state.ignoreText}
             onIgnoreTextChanged={this.onIgnoreTextChanged}
             onShowExamples={this.onShowGitIgnoreExamples}
+            autoIgnoreSetting={this.state.autoIgnoreSetting}
+            autoIgnoreGlobalEnabled={
+              this.props.dispatcher.getAutoIgnoreConfig().enabled
+            }
+            onAutoIgnoreSettingChanged={this.onAutoIgnoreSettingChanged}
           />
         )
       }
@@ -318,6 +331,10 @@ export class RepositorySettings extends React.Component<
     this.props.dispatcher.openInBrowser('https://git-scm.com/docs/gitignore')
   }
 
+  private onAutoIgnoreSettingChanged = (setting: AutoIgnoreRepoSetting) => {
+    this.setState({ autoIgnoreSetting: setting })
+  }
+
   private onSubmit = async () => {
     this.setState({ disabled: true, errors: undefined })
     const errors = new Array<JSX.Element | string>()
@@ -355,6 +372,19 @@ export class RepositorySettings extends React.Component<
         )
         errors.push(`Failed saving the .gitignore file: ${e}`)
       }
+    }
+
+    if (
+      this.state.autoIgnoreSetting !==
+      autoIgnoreRepoSetting(
+        this.props.dispatcher.getAutoIgnoreConfig(),
+        this.props.repository.path
+      )
+    ) {
+      this.props.dispatcher.setAutoIgnoreRepoSetting(
+        this.props.repository,
+        this.state.autoIgnoreSetting
+      )
     }
 
     // only update this if it will be different from what we have stored

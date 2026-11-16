@@ -1,4 +1,9 @@
 import { AppFileStatusKind } from '../models/status'
+import {
+  AutoIgnoreRepoOverride,
+  AutoIgnoreRepoSetting,
+  IAutoIgnoreConfig,
+} from '../models/auto-ignore'
 
 /**
  * Standard-practice ignore patterns are deliberately a small subset of
@@ -130,4 +135,37 @@ export function formatAutoIgnoreCommitMessage(
   return message.length > 0
     ? message
     : `chore(gitignore): auto-ignore ${patterns.join(', ')}`
+}
+
+/** The setting a repository's select shows: its override, or 'inherit'. */
+export function autoIgnoreRepoSetting(
+  config: IAutoIgnoreConfig,
+  repositoryPath: string
+): AutoIgnoreRepoSetting {
+  return config.repoOverrides?.[repositoryPath] ?? 'inherit'
+}
+
+/** Does auto-ignore run in this repository? Its override, else `enabled`. */
+export function isAutoIgnoreEnabledFor(
+  config: IAutoIgnoreConfig,
+  repositoryPath: string
+): boolean {
+  const setting = autoIgnoreRepoSetting(config, repositoryPath)
+  return setting === 'inherit' ? config.enabled : setting === 'on'
+}
+
+/** The config with this repository's override set, or dropped for 'inherit'. */
+export function withAutoIgnoreRepoSetting(
+  config: IAutoIgnoreConfig,
+  repositoryPath: string,
+  setting: AutoIgnoreRepoSetting
+): IAutoIgnoreConfig {
+  const repoOverrides: { [path: string]: AutoIgnoreRepoOverride } = {
+    ...config.repoOverrides,
+  }
+  delete repoOverrides[repositoryPath]
+  if (setting !== 'inherit') {
+    repoOverrides[repositoryPath] = setting
+  }
+  return { ...config, repoOverrides }
 }

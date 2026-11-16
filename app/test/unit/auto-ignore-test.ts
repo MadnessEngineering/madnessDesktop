@@ -2,13 +2,17 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 
 import {
+  autoIgnoreRepoSetting,
   findLoneAutoIgnoreMatch,
   formatAutoIgnoreCommitMessage,
   isValidStandardPattern,
   matchStandardPattern,
   patternsMissingFrom,
+  isAutoIgnoreEnabledFor,
   suggestStandardPatterns,
+  withAutoIgnoreRepoSetting,
 } from '../../src/lib/auto-ignore'
+import { DefaultAutoIgnoreConfig } from '../../src/models/auto-ignore'
 import { AppFileStatusKind } from '../../src/models/status'
 
 const untracked = (path: string) => ({
@@ -172,6 +176,59 @@ describe('auto-ignore', () => {
         formatAutoIgnoreCommitMessage('  ', ['.claude_temp/']),
         'chore(gitignore): auto-ignore .claude_temp/'
       )
+    })
+  })
+
+  describe('per-repository override', () => {
+    const work = '/Users/dan/work/alloy'
+    const lab = '/Users/dan/lab/inventorium'
+
+    it('follows the global switch when a repository has no say', () => {
+      const off = { ...DefaultAutoIgnoreConfig, enabled: false }
+      const on = { ...DefaultAutoIgnoreConfig, enabled: true }
+      assert.equal(autoIgnoreRepoSetting(on, lab), 'inherit')
+      assert.equal(isAutoIgnoreEnabledFor(off, lab), false)
+      assert.equal(isAutoIgnoreEnabledFor(on, lab), true)
+    })
+
+    it("a repository's override beats the global switch both ways", () => {
+      const on = withAutoIgnoreRepoSetting(
+        { ...DefaultAutoIgnoreConfig, enabled: true },
+        work,
+        'off'
+      )
+      assert.equal(isAutoIgnoreEnabledFor(on, work), false)
+      assert.equal(isAutoIgnoreEnabledFor(on, lab), true)
+
+      const off = withAutoIgnoreRepoSetting(
+        { ...DefaultAutoIgnoreConfig, enabled: false },
+        lab,
+        'on'
+      )
+      assert.equal(isAutoIgnoreEnabledFor(off, lab), true)
+      assert.equal(isAutoIgnoreEnabledFor(off, work), false)
+    })
+
+    it("'inherit' drops the override and leaves the others", () => {
+      let config = withAutoIgnoreRepoSetting(
+        DefaultAutoIgnoreConfig,
+        work,
+        'off'
+      )
+      config = withAutoIgnoreRepoSetting(config, lab, 'on')
+      config = withAutoIgnoreRepoSetting(config, work, 'inherit')
+      assert.deepEqual(config.repoOverrides, { [lab]: 'on' })
+      assert.equal(autoIgnoreRepoSetting(config, work), 'inherit')
+    })
+
+    it('does not change the config it was given', () => {
+      const before = withAutoIgnoreRepoSetting(
+        DefaultAutoIgnoreConfig,
+        work,
+        'off'
+      )
+      withAutoIgnoreRepoSetting(before, work, 'on')
+      assert.deepEqual(before.repoOverrides, { [work]: 'off' })
     })
   })
 })

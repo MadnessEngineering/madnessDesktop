@@ -20,7 +20,19 @@ export interface IAutoIgnoreConfig {
   readonly autoCommit: boolean
   /** Commit message; `{patterns}` is replaced with the appended rules. */
   readonly commitMessage: string
+  /**
+   * A repository's own say, keyed by its path: 'on' runs auto-ignore there even
+   * with `enabled` off, 'off' keeps it out even with `enabled` on (a work repo
+   * where a .gitignore commit isn't ours to make). No entry follows `enabled`.
+   * Optional so configs saved before it still load.
+   */
+  readonly repoOverrides?: { readonly [path: string]: AutoIgnoreRepoOverride }
 }
+
+export type AutoIgnoreRepoOverride = 'on' | 'off'
+
+/** What the Repository Settings select offers: an override, or none. */
+export type AutoIgnoreRepoSetting = AutoIgnoreRepoOverride | 'inherit'
 
 export const AutoIgnoreConfigKey = 'auto-ignore-config'
 

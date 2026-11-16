@@ -414,6 +414,7 @@ import {
 import {
   findLoneAutoIgnoreMatch,
   formatAutoIgnoreCommitMessage,
+  isAutoIgnoreEnabledFor,
   patternsMissingFrom,
 } from '../auto-ignore'
 import { appendAutoIgnoreLog } from '../auto-ignore-log'
@@ -3458,7 +3459,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ): Promise<void> {
     const config = this.autoIgnoreConfig
     if (
-      !config.enabled ||
+      !isAutoIgnoreEnabledFor(config, repository.path) ||
       this.autoIgnoreInFlight.has(repository.id) ||
       status.currentBranch === undefined ||
       status.mergeHeadFound ||
@@ -7537,7 +7538,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.autoIgnoreAttempted.clear()
     this.emitUpdate()
 
-    if (repository !== null && config.enabled) {
+    if (
+      repository !== null &&
+      isAutoIgnoreEnabledFor(config, repository.path)
+    ) {
       this._refreshRepository(repository)
     }
   }

@@ -147,6 +147,7 @@ import {
 import { WorktreeEntry } from '../../models/worktree'
 import { RemoteAllowList } from '../../models/remote-policy'
 import { AgentLaunchTarget } from '../../lib/agent-review'
+import { withAutoIgnoreRepoSetting } from '../../lib/auto-ignore'
 
 /**
  * An error handler function.
@@ -1300,6 +1301,21 @@ export class Dispatcher {
   /** Current standard ignore config, read at menu-build time. */
   public getAutoIgnoreConfig() {
     return this.appStore.getState().autoIgnoreConfig
+  }
+
+  /**
+   * This repository's own say on auto-ignore ('inherit' drops it), from
+   * Repository Settings. Re-checks the repository when that turns it on.
+   */
+  public setAutoIgnoreRepoSetting(
+    repository: Repository,
+    setting: import('../../models/auto-ignore').AutoIgnoreRepoSetting
+  ) {
+    const { autoIgnoreConfig } = this.appStore.getState()
+    return this.appStore._setAutoIgnoreConfig(
+      repository,
+      withAutoIgnoreRepoSetting(autoIgnoreConfig, repository.path, setting)
+    )
   }
 
   /**
