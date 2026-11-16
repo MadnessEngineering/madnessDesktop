@@ -48,6 +48,7 @@ import { Repository } from '../../models/repository'
 import { AutomationHooksPreferences } from './automation-hooks'
 import { ClaudeCodePreferences } from './claude-code'
 import { AutomationPreferences } from './automation'
+import { applySettings, ISettingsFile } from '../../lib/settings-transfer'
 import { TerminalPreferences } from './terminal'
 import { AIServicesPreferences } from './ai-services'
 import { Keybindings } from './keybindings'
@@ -460,6 +461,16 @@ export class Preferences extends React.Component<
     }
 
     this.props.onDismissed()
+  }
+
+  /**
+   * An imported settings file (Advanced → Settings file). Cancel first, so the
+   * theme and tab-size previews revert before the file's values land, and
+   * nothing this dialog holds is saved over them. Read at the next start.
+   */
+  private onApplySettingsFile = (file: ISettingsFile) => {
+    this.onCancel()
+    applySettings(localStorage, file)
   }
 
   public render() {
@@ -909,6 +920,7 @@ export class Preferences extends React.Component<
             onWorktreesEnabledChanged={this.onWorktreesEnabledChanged}
             onMadnessModeEnabledChanged={this.onMadnessModeEnabledChanged}
             onShowReflogTabChanged={this.onShowReflogTabChanged}
+            onApplySettingsFile={this.onApplySettingsFile}
           />
         )
         break

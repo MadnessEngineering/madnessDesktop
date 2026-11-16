@@ -4,6 +4,8 @@ import { Checkbox, CheckboxValue } from '../lib/checkbox'
 import { LinkButton } from '../lib/link-button'
 import { SamplesURL } from '../../lib/stats'
 import { isWindowsOpenSSHAvailable } from '../../lib/ssh/ssh'
+import { ISettingsFile } from '../../lib/settings-transfer'
+import { SettingsFileSection } from './settings-file'
 
 interface IAdvancedPreferencesProps {
   readonly useWindowsOpenSSH: boolean
@@ -20,6 +22,8 @@ interface IAdvancedPreferencesProps {
   readonly onWorktreesEnabledChanged: (enabled: boolean) => void
   readonly onMadnessModeEnabledChanged: (enabled: boolean) => void
   readonly onShowReflogTabChanged: (value: boolean) => void
+  /** Close Settings without saving, then write an imported settings file. */
+  readonly onApplySettingsFile: (file: ISettingsFile) => void
 }
 
 interface IAdvancedPreferencesState {
@@ -222,6 +226,9 @@ export class Advanced extends React.Component<
             </p>
           </div>
         </div>
+        <SettingsFileSection
+          onApplySettingsFile={this.props.onApplySettingsFile}
+        />
       </DialogContent>
     )
   }
