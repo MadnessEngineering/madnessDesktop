@@ -47,7 +47,8 @@ import { Prompts } from './prompts'
 import { Repository } from '../../models/repository'
 import { AutomationHooksPreferences } from './automation-hooks'
 import { ClaudeCodePreferences } from './claude-code'
-import { AutoIgnorePreferences } from './auto-ignore'
+import { AutomationPreferences } from './automation'
+import { TerminalPreferences } from './terminal'
 import { AIServicesPreferences } from './ai-services'
 import { Keybindings } from './keybindings'
 import { MqttPreferences } from './mqtt'
@@ -511,8 +512,8 @@ export class Preferences extends React.Component<
               MQTT
             </span>
             <span id={this.getTabId(PreferencesTab.AutomationHooks)}>
-              <Octicon className="icon" symbol={octicons.terminal} />
-              Automation
+              <Octicon className="icon" symbol={octicons.webhook} />
+              Hooks
             </span>
             <span id={this.getTabId(PreferencesTab.Keybindings)}>
               <Octicon className="icon" symbol={octicons.key} />
@@ -526,9 +527,14 @@ export class Preferences extends React.Component<
               <Octicon className="icon" symbol={octicons.rocket} />
               Claude Code
             </span>
-            <span id={this.getTabId(PreferencesTab.AutoIgnore)}>
-              <Octicon className="icon" symbol={octicons.eyeClosed} />
-              Auto-Ignore
+            <span id={this.getTabId(PreferencesTab.Automation)}>
+              <Octicon className="icon" symbol={octicons.workflow} />
+              Automation
+            </span>
+            {/* Last: a tab's place in this list is its enum value (see tabToVisualIndex) */}
+            <span id={this.getTabId(PreferencesTab.Terminal)}>
+              <Octicon className="icon" symbol={octicons.terminal} />
+              Terminal
             </span>
           </TabBar>
 
@@ -578,8 +584,11 @@ export class Preferences extends React.Component<
       case PreferencesTab.ClaudeCode:
         suffix = 'claude-code'
         break
-      case PreferencesTab.AutoIgnore:
-        suffix = 'auto-ignore'
+      case PreferencesTab.Automation:
+        suffix = 'automation'
+        break
+      case PreferencesTab.Terminal:
+        suffix = 'terminal'
         break
       default:
         return assertNever(tab, `Unknown tab type: ${tab}`)
@@ -886,14 +895,9 @@ export class Preferences extends React.Component<
             optOutOfUsageTracking={this.state.optOutOfUsageTracking}
             useExternalCredentialHelper={this.state.useExternalCredentialHelper}
             repositoryIndicatorsEnabled={this.state.repositoryIndicatorsEnabled}
-            autoSwitchOnChangesEnabled={this.state.autoSwitchOnChangesEnabled}
             worktreesEnabled={this.state.worktreesEnabled}
             madnessModeEnabled={this.state.madnessModeEnabled}
             showReflogTab={this.state.showReflogTab}
-            terminalOpenOnStartup={this.state.terminalOpenOnStartup}
-            terminalFontSize={this.state.terminalFontSize}
-            terminalCursorBlink={this.state.terminalCursorBlink}
-            terminalScrollback={this.state.terminalScrollback}
             onUseWindowsOpenSSHChanged={this.onUseWindowsOpenSSHChanged}
             onOptOutofReportingChanged={this.onOptOutofReportingChanged}
             onUseExternalCredentialHelperChanged={
@@ -902,20 +906,9 @@ export class Preferences extends React.Component<
             onRepositoryIndicatorsEnabledChanged={
               this.onRepositoryIndicatorsEnabledChanged
             }
-            onAutoSwitchOnChangesEnabledChanged={
-              this.onAutoSwitchOnChangesEnabledChanged
-            }
             onWorktreesEnabledChanged={this.onWorktreesEnabledChanged}
             onMadnessModeEnabledChanged={this.onMadnessModeEnabledChanged}
             onShowReflogTabChanged={this.onShowReflogTabChanged}
-            onTerminalOpenOnStartupChanged={this.onTerminalOpenOnStartupChanged}
-            onTerminalFontSizeChanged={this.onTerminalFontSizeChanged}
-            onTerminalCursorBlinkChanged={this.onTerminalCursorBlinkChanged}
-            onTerminalScrollbackChanged={this.onTerminalScrollbackChanged}
-            chatHistoryArchiveConfig={this.state.chatHistoryArchiveConfig}
-            onChatHistoryArchiveConfigChanged={
-              this.onChatHistoryArchiveConfigChanged
-            }
           />
         )
         break
@@ -923,11 +916,34 @@ export class Preferences extends React.Component<
       case PreferencesTab.ClaudeCode:
         View = <ClaudeCodePreferences />
         break
-      case PreferencesTab.AutoIgnore:
+      case PreferencesTab.Automation:
         View = (
-          <AutoIgnorePreferences
-            config={this.state.autoIgnoreConfig}
-            onConfigChanged={this.onAutoIgnoreConfigChanged}
+          <AutomationPreferences
+            autoIgnoreConfig={this.state.autoIgnoreConfig}
+            onAutoIgnoreConfigChanged={this.onAutoIgnoreConfigChanged}
+            chatHistoryArchiveConfig={this.state.chatHistoryArchiveConfig}
+            onChatHistoryArchiveConfigChanged={
+              this.onChatHistoryArchiveConfigChanged
+            }
+            autoSwitchOnChangesEnabled={this.state.autoSwitchOnChangesEnabled}
+            onAutoSwitchOnChangesEnabledChanged={
+              this.onAutoSwitchOnChangesEnabledChanged
+            }
+            onOpenHooks={this.onOpenHooksTab}
+          />
+        )
+        break
+      case PreferencesTab.Terminal:
+        View = (
+          <TerminalPreferences
+            terminalOpenOnStartup={this.state.terminalOpenOnStartup}
+            terminalFontSize={this.state.terminalFontSize}
+            terminalCursorBlink={this.state.terminalCursorBlink}
+            terminalScrollback={this.state.terminalScrollback}
+            onTerminalOpenOnStartupChanged={this.onTerminalOpenOnStartupChanged}
+            onTerminalFontSizeChanged={this.onTerminalFontSizeChanged}
+            onTerminalCursorBlinkChanged={this.onTerminalCursorBlinkChanged}
+            onTerminalScrollbackChanged={this.onTerminalScrollbackChanged}
           />
         )
         break
@@ -1524,7 +1540,15 @@ export class Preferences extends React.Component<
   }
 
   private onTabClicked = (visualIndex: number) => {
-    const selectedIndex = this.visualIndexToTab(visualIndex)
+    this.selectTab(this.visualIndexToTab(visualIndex))
+  }
+
+  /** The Automation tab's "Open Hooks" link. */
+  private onOpenHooksTab = () => {
+    this.selectTab(PreferencesTab.AutomationHooks)
+  }
+
+  private selectTab(selectedIndex: PreferencesTab) {
     setNumber(lastSelectedTabKey, selectedIndex)
     this.setState({ selectedIndex })
   }

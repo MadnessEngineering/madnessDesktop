@@ -1,55 +1,31 @@
 import * as React from 'react'
 import { DialogContent } from '../dialog'
-import { TextBox } from '../lib/text-box'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
 import { LinkButton } from '../lib/link-button'
-import { Button } from '../lib/button'
 import { SamplesURL } from '../../lib/stats'
 import { isWindowsOpenSSHAvailable } from '../../lib/ssh/ssh'
-import { enableAutoSwitchOnChanges } from '../../lib/feature-flag'
-import {
-  IChatHistoryArchiveConfig,
-  IChatHistoryArchiveLogEntry,
-} from '../../models/chat-history-archive'
-import { loadArchiveLog, clearArchiveLog } from '../../lib/chat-history-archive'
 
 interface IAdvancedPreferencesProps {
   readonly useWindowsOpenSSH: boolean
   readonly optOutOfUsageTracking: boolean
   readonly useExternalCredentialHelper: boolean
   readonly repositoryIndicatorsEnabled: boolean
-  readonly autoSwitchOnChangesEnabled: boolean
   readonly worktreesEnabled: boolean
   readonly madnessModeEnabled: boolean
   readonly showReflogTab: boolean
-  readonly terminalOpenOnStartup: boolean
-  readonly terminalFontSize: number
-  readonly terminalCursorBlink: boolean
-  readonly terminalScrollback: number
   readonly onUseWindowsOpenSSHChanged: (checked: boolean) => void
   readonly onOptOutofReportingChanged: (checked: boolean) => void
   readonly onUseExternalCredentialHelperChanged: (checked: boolean) => void
   readonly onRepositoryIndicatorsEnabledChanged: (enabled: boolean) => void
-  readonly onAutoSwitchOnChangesEnabledChanged: (enabled: boolean) => void
   readonly onWorktreesEnabledChanged: (enabled: boolean) => void
   readonly onMadnessModeEnabledChanged: (enabled: boolean) => void
   readonly onShowReflogTabChanged: (value: boolean) => void
-  readonly onTerminalOpenOnStartupChanged: (value: boolean) => void
-  readonly onTerminalFontSizeChanged: (value: number) => void
-  readonly onTerminalCursorBlinkChanged: (value: boolean) => void
-  readonly onTerminalScrollbackChanged: (value: number) => void
-  // Chat History Archive (merged)
-  readonly chatHistoryArchiveConfig: IChatHistoryArchiveConfig
-  readonly onChatHistoryArchiveConfigChanged: (
-    config: IChatHistoryArchiveConfig
-  ) => void
 }
 
 interface IAdvancedPreferencesState {
   readonly optOutOfUsageTracking: boolean
   readonly canUseWindowsSSH: boolean
   readonly useExternalCredentialHelper: boolean
-  readonly archiveLog: ReadonlyArray<IChatHistoryArchiveLogEntry>
 }
 
 export class Advanced extends React.Component<
@@ -63,13 +39,11 @@ export class Advanced extends React.Component<
       optOutOfUsageTracking: this.props.optOutOfUsageTracking,
       canUseWindowsSSH: false,
       useExternalCredentialHelper: this.props.useExternalCredentialHelper,
-      archiveLog: [],
     }
   }
 
   public componentDidMount() {
     this.checkSSHAvailability()
-    this.setState({ archiveLog: loadArchiveLog() })
   }
 
   private async checkSSHAvailability() {
@@ -100,12 +74,6 @@ export class Advanced extends React.Component<
     this.props.onRepositoryIndicatorsEnabledChanged(event.currentTarget.checked)
   }
 
-  private onAutoSwitchOnChangesEnabledChanged = (
-    event: React.FormEvent<HTMLInputElement>
-  ) => {
-    this.props.onAutoSwitchOnChangesEnabledChanged(event.currentTarget.checked)
-  }
-
   private onShowReflogTabChanged = (
     event: React.FormEvent<HTMLInputElement>
   ) => {
@@ -122,32 +90,6 @@ export class Advanced extends React.Component<
     event: React.FormEvent<HTMLInputElement>
   ) => {
     this.props.onMadnessModeEnabledChanged(event.currentTarget.checked)
-  }
-
-  private onTerminalOpenOnStartupChanged = (
-    event: React.FormEvent<HTMLInputElement>
-  ) => {
-    this.props.onTerminalOpenOnStartupChanged(event.currentTarget.checked)
-  }
-
-  private onTerminalCursorBlinkChanged = (
-    event: React.FormEvent<HTMLInputElement>
-  ) => {
-    this.props.onTerminalCursorBlinkChanged(event.currentTarget.checked)
-  }
-
-  private onTerminalFontSizeChanged = (value: string) => {
-    const n = parseInt(value, 10)
-    if (!isNaN(n) && n >= 8 && n <= 32) {
-      this.props.onTerminalFontSizeChanged(n)
-    }
-  }
-
-  private onTerminalScrollbackChanged = (value: string) => {
-    const n = parseInt(value, 10)
-    if (!isNaN(n) && n >= 100 && n <= 100000) {
-      this.props.onTerminalScrollbackChanged(n)
-    }
   }
 
   private onUseWindowsOpenSSHChanged = (
@@ -192,30 +134,6 @@ export class Advanced extends React.Component<
               performance for users with many repositories.
             </p>
           </div>
-          {enableAutoSwitchOnChanges() && (
-            <Checkbox
-              label="Auto-switch to repositories with new changes"
-              value={
-                this.props.autoSwitchOnChangesEnabled
-                  ? CheckboxValue.On
-                  : CheckboxValue.Off
-              }
-              onChange={this.onAutoSwitchOnChangesEnabledChanged}
-              ariaDescribedBy="auto-switch-description"
-            />
-          )}
-          {enableAutoSwitchOnChanges() && (
-            <div
-              id="auto-switch-description"
-              className="git-settings-description"
-            >
-              <p>
-                When enabled, the app will poll repositories every 15 seconds
-                and automatically switch to whichever repo gains new changes.
-                Will not switch if your current repo has uncommitted work.
-              </p>
-            </div>
-          )}
         </div>
         <div className="advanced-section">
           <h2>Repository view</h2>
@@ -266,37 +184,6 @@ export class Advanced extends React.Component<
           </div>
         </div>
         <div className="advanced-section">
-          <h2>Integrated terminal</h2>
-          <Checkbox
-            label="Show terminal on startup"
-            value={
-              this.props.terminalOpenOnStartup
-                ? CheckboxValue.On
-                : CheckboxValue.Off
-            }
-            onChange={this.onTerminalOpenOnStartupChanged}
-          />
-          <Checkbox
-            label="Cursor blink"
-            value={
-              this.props.terminalCursorBlink
-                ? CheckboxValue.On
-                : CheckboxValue.Off
-            }
-            onChange={this.onTerminalCursorBlinkChanged}
-          />
-          <TextBox
-            label="Font size (8–32)"
-            value={String(this.props.terminalFontSize)}
-            onValueChanged={this.onTerminalFontSizeChanged}
-          />
-          <TextBox
-            label="Scrollback lines (100–100000)"
-            value={String(this.props.terminalScrollback)}
-            onValueChanged={this.onTerminalScrollbackChanged}
-          />
-        </div>
-        <div className="advanced-section">
           <h2>Usage</h2>
           <Checkbox
             label={this.reportDesktopUsageLabel()}
@@ -335,135 +222,7 @@ export class Advanced extends React.Component<
             </p>
           </div>
         </div>
-        {this.renderChatHistoryArchive()}
       </DialogContent>
-    )
-  }
-
-  // ─── Chat History Archive ──────────────────────────────────────────────────
-
-  private onArchiveEnabledChanged = (e: React.FormEvent<HTMLInputElement>) => {
-    this.props.onChatHistoryArchiveConfigChanged({
-      ...this.props.chatHistoryArchiveConfig,
-      enabled: (e.currentTarget as HTMLInputElement).checked,
-    })
-  }
-
-  private onArchivePathChanged = (value: string) => {
-    this.props.onChatHistoryArchiveConfigChanged({
-      ...this.props.chatHistoryArchiveConfig,
-      archivePath: value,
-    })
-  }
-
-  private onWatchDirsChanged = (value: string) => {
-    const watchDirs = value
-      .split(',')
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
-    this.props.onChatHistoryArchiveConfigChanged({
-      ...this.props.chatHistoryArchiveConfig,
-      watchDirs,
-    })
-  }
-
-  private onAutoCommitChanged = (e: React.FormEvent<HTMLInputElement>) => {
-    const autoCommit = (e.currentTarget as HTMLInputElement).checked
-    this.props.onChatHistoryArchiveConfigChanged({
-      ...this.props.chatHistoryArchiveConfig,
-      autoCommit,
-      autoPush: autoCommit
-        ? this.props.chatHistoryArchiveConfig.autoPush
-        : false,
-    })
-  }
-
-  private onAutoPushChanged = (e: React.FormEvent<HTMLInputElement>) => {
-    this.props.onChatHistoryArchiveConfigChanged({
-      ...this.props.chatHistoryArchiveConfig,
-      autoPush: (e.currentTarget as HTMLInputElement).checked,
-    })
-  }
-
-  private onClearArchiveLog = () => {
-    clearArchiveLog()
-    this.setState({ archiveLog: loadArchiveLog() })
-  }
-
-  private renderChatHistoryArchive() {
-    const { chatHistoryArchiveConfig: config } = this.props
-    const disabled = !config.enabled
-
-    return (
-      <div className="advanced-section">
-        <h2>Chat History Archive</h2>
-        <p className="git-settings-description">
-          Automatically detect and centralize AI conversation history from
-          tracked repositories.
-        </p>
-
-        <Checkbox
-          label="Enable background chat history archiving"
-          value={config.enabled ? CheckboxValue.On : CheckboxValue.Off}
-          onChange={this.onArchiveEnabledChanged}
-        />
-
-        <TextBox
-          label="Archive Path"
-          value={config.archivePath}
-          onValueChanged={this.onArchivePathChanged}
-          placeholder="/path/to/archive/repo"
-          disabled={disabled}
-        />
-
-        <TextBox
-          label="Watch Directories"
-          value={config.watchDirs.join(', ')}
-          onValueChanged={this.onWatchDirsChanged}
-          placeholder=".specstory/history, .claude"
-          disabled={disabled}
-        />
-
-        <Checkbox
-          label="Auto-commit after archiving"
-          value={config.autoCommit ? CheckboxValue.On : CheckboxValue.Off}
-          onChange={this.onAutoCommitChanged}
-          disabled={disabled}
-        />
-
-        <Checkbox
-          label="Auto-push after commit"
-          value={config.autoPush ? CheckboxValue.On : CheckboxValue.Off}
-          onChange={this.onAutoPushChanged}
-          disabled={disabled || !config.autoCommit}
-        />
-
-        {this.state.archiveLog.length > 0 && (
-          <div className="chat-history-archive-history">
-            <h3>Archive History</h3>
-            <div
-              className="chat-history-log-list"
-              style={{ maxHeight: '200px', overflow: 'auto' }}
-            >
-              {this.state.archiveLog.map((entry, index) => (
-                <div key={index} className="chat-history-log-entry">
-                  <div>{new Date(entry.timestamp).toLocaleString()}</div>
-                  <div>{entry.repos.join(', ')}</div>
-                  <div>
-                    {entry.archived} archived,{' '}
-                    <span
-                      style={entry.failed > 0 ? { color: 'red' } : undefined}
-                    >
-                      {entry.failed} failed
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Button onClick={this.onClearArchiveLog}>Clear Log</Button>
-          </div>
-        )}
-      </div>
     )
   }
 

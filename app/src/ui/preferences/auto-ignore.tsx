@@ -21,6 +21,8 @@ import {
 interface IAutoIgnorePreferencesProps {
   readonly config: IAutoIgnoreConfig
   readonly onConfigChanged: (config: IAutoIgnoreConfig) => void
+  /** Inside the Automation tab's DialogContent: render without its own. */
+  readonly embedded?: boolean
 }
 
 interface IAutoIgnorePreferencesState {
@@ -304,15 +306,14 @@ export class AutoIgnorePreferences extends React.Component<
   }
 
   public render() {
-    return (
-      <DialogContent>
-        <div className="auto-ignore-preferences">
-          {this.renderBehaviour()}
-          {this.renderPatterns()}
-          {this.renderCommitMessage()}
-          {this.renderLog()}
-        </div>
-      </DialogContent>
+    const body = (
+      <div className="auto-ignore-preferences">
+        {this.renderBehaviour()}
+        {this.renderPatterns()}
+        {this.renderCommitMessage()}
+        {this.renderLog()}
+      </div>
     )
+    return this.props.embedded ? body : <DialogContent>{body}</DialogContent>
   }
 }

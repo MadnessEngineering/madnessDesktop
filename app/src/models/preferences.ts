@@ -11,5 +11,9 @@ export enum PreferencesTab {
   Keybindings,
   Advanced,
   ClaudeCode,
-  AutoIgnore,
+  // Was AutoIgnore: same value, so a remembered last tab still lands here.
+  // Auto-Ignore, the Chat History Archive and auto-switch (todo a8c1b611).
+  Automation,
+  // Appended, never inserted: these values are stored as the last open tab.
+  Terminal,
 }
