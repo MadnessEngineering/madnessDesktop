@@ -13,8 +13,16 @@ const mqttContext: HookScript = {
 set -euo pipefail
 
 DEVICE_NAME="\${DeNa:-macbook}"
-MQTT_HOST="\${MADNESS_MQTT_HOST:-localhost}"
-MQTT_PORT="\${MADNESS_MQTT_PORT:-1883}"
+# Broker: the environment, then ~/.mad/mqtt.env (shared by the Madness
+# tools), then localhost:1883.
+mad_mqtt_env() {
+  [[ -f "$HOME/.mad/mqtt.env" ]] || return 0
+  sed -n "s/^$1=//p" "$HOME/.mad/mqtt.env" | tail -n 1 | tr -d '\\042\\047'
+}
+MQTT_HOST="\${MADNESS_MQTT_HOST:-$(mad_mqtt_env MADNESS_MQTT_HOST)}"
+MQTT_HOST="\${MQTT_HOST:-localhost}"
+MQTT_PORT="\${MADNESS_MQTT_PORT:-$(mad_mqtt_env MADNESS_MQTT_PORT)}"
+MQTT_PORT="\${MQTT_PORT:-1883}"
 GIT_CONTEXT_TOPIC="\${MADNESS_GIT_CONTEXT_TOPIC:-status/\${DEVICE_NAME}/claude/git/context}"
 GIT_EVENT_TOPIC="\${MADNESS_GIT_EVENT_TOPIC:-status/\${DEVICE_NAME}/claude/git/events}"
 GIT_CONTEXT_FILE="$(git rev-parse --git-dir 2>/dev/null)/claude-session-context.json"
@@ -98,8 +106,16 @@ case "$COMMIT_SOURCE" in
 esac
 
 DEVICE_NAME="\${DeNa:-macbook}"
-MQTT_HOST="\${MADNESS_MQTT_HOST:-localhost}"
-MQTT_PORT="\${MADNESS_MQTT_PORT:-1883}"
+# Broker: the environment, then ~/.mad/mqtt.env (shared by the Madness
+# tools), then localhost:1883.
+mad_mqtt_env() {
+  [[ -f "$HOME/.mad/mqtt.env" ]] || return 0
+  sed -n "s/^$1=//p" "$HOME/.mad/mqtt.env" | tail -n 1 | tr -d '\\042\\047'
+}
+MQTT_HOST="\${MADNESS_MQTT_HOST:-$(mad_mqtt_env MADNESS_MQTT_HOST)}"
+MQTT_HOST="\${MQTT_HOST:-localhost}"
+MQTT_PORT="\${MADNESS_MQTT_PORT:-$(mad_mqtt_env MADNESS_MQTT_PORT)}"
+MQTT_PORT="\${MQTT_PORT:-1883}"
 GIT_CONTEXT_TOPIC="\${MADNESS_GIT_CONTEXT_TOPIC:-status/\${DEVICE_NAME}/claude/git/context}"
 GIT_CONTEXT_FILE="$(git rev-parse --git-dir 2>/dev/null)/claude-session-context.json"
 

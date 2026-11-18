@@ -1,5 +1,6 @@
-import { hostname } from 'os'
+import { homedir, hostname } from 'os'
 import { join } from 'path'
+import { readFileSync } from 'fs'
 import { chmod, mkdir, writeFile } from 'fs/promises'
 import { TokenStore } from '../stores/token-store'
 
@@ -20,10 +21,51 @@ const MQTT_KEYTAR_KEY = __DEV__
   : 'Madness Desktop - MQTT'
 const MQTT_KEYTAR_ACCOUNT = 'mqtt-password'
 
+/** Shared by the Madness tools (claude-prime hooks, MadQTT, Shellomancy). */
+export const MadMqttEnvPath = join(homedir(), '.mad', 'mqtt.env')
+
+/** KEY=VALUE lines from ~/.mad/mqtt.env; empty if it's missing. */
+export function readMadMqttEnv(
+  path: string = MadMqttEnvPath
+): Record<string, string> {
+  const values: Record<string, string> = {}
+  let text: string
+  try {
+    text = readFileSync(path, 'utf8')
+  } catch {
+    return values
+  }
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    const eq = line.indexOf('=')
+    if (line === '' || line.startsWith('#') || eq < 0) {
+      continue
+    }
+    values[line.slice(0, eq).trim()] = line
+      .slice(eq + 1)
+      .trim()
+      .replace(/^['"]|['"]$/g, '')
+  }
+  return values
+}
+
+/**
+ * The broker when nothing is saved in preferences: the environment, then
+ * ~/.mad/mqtt.env, then localhost:1883. An app launched from the Dock never
+ * sees ~/.zshrc, so the shared file is how it finds the eaws broker (4140).
+ */
+export function defaultBroker(
+  env: Record<string, string | undefined> = process.env,
+  shared: Record<string, string> = readMadMqttEnv()
+): { host: string; port: number } {
+  const host = env.MADNESS_MQTT_HOST || shared.MADNESS_MQTT_HOST || 'localhost'
+  const port = Number(env.MADNESS_MQTT_PORT || shared.MADNESS_MQTT_PORT) || 1883
+  return { host, port }
+}
+
 export const DefaultMqttConfig: IMqttConfig = {
   enabled: true,
-  host: 'localhost',
-  port: 1883,
+  ...defaultBroker(),
   deviceName: hostname(),
   topicPrefix: 'status',
   username: '',
