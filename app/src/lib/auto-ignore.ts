@@ -62,24 +62,39 @@ export function matchStandardPattern(path: string, pattern: string): boolean {
 
 interface IAutoIgnoreCandidate {
   readonly path: string
-  readonly status: { readonly kind: AppFileStatusKind }
+  readonly status: {
+    readonly kind: AppFileStatusKind
+    readonly submoduleStatus?: unknown
+  }
 }
 
 /**
- * When every change is an untracked file covered by a standard pattern,
- * return the patterns that cover them (in config order). Otherwise null:
- * a repository with any real work in it is never touched.
+ * A submodule entry is another repository's work: a pointer bump, or edits
+ * inside it that this repository can't commit at all. The auto-ignore commit
+ * holds only .gitignore, so these never block it and are never touched.
+ */
+export function isSubmoduleChange(file: IAutoIgnoreCandidate): boolean {
+  return file.status.submoduleStatus !== undefined
+}
+
+/**
+ * When every change (submodules aside) is an untracked file covered by a
+ * standard pattern, return the patterns that cover them (in config order).
+ * Otherwise null: a repository with any real work in it is never touched.
  */
 export function findLoneAutoIgnoreMatch(
   files: ReadonlyArray<IAutoIgnoreCandidate>,
   patterns: ReadonlyArray<string>
 ): ReadonlyArray<string> | null {
-  if (files.length === 0 || patterns.length === 0) {
+  if (patterns.length === 0) {
     return null
   }
 
   const used = new Set<string>()
   for (const file of files) {
+    if (isSubmoduleChange(file)) {
+      continue
+    }
     if (file.status.kind !== AppFileStatusKind.Untracked) {
       return null
     }
@@ -90,7 +105,7 @@ export function findLoneAutoIgnoreMatch(
     used.add(pattern)
   }
 
-  return patterns.filter(p => used.has(p))
+  return used.size > 0 ? patterns.filter(p => used.has(p)) : null
 }
 
 /** Patterns from `patterns` that aren't already a line in `gitIgnoreText`. */

@@ -415,6 +415,7 @@ import {
   findLoneAutoIgnoreMatch,
   formatAutoIgnoreCommitMessage,
   isAutoIgnoreEnabledFor,
+  isSubmoduleChange,
   patternsMissingFrom,
 } from '../auto-ignore'
 import { appendAutoIgnoreLog } from '../auto-ignore-log'
@@ -3531,7 +3532,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
       const gitStore = this.gitStoreCache.get(repository)
       const after = await gitStore.loadStatus()
-      const changes = after?.workingDirectory.files ?? []
+      const changes = (after?.workingDirectory.files ?? []).filter(
+        f => !isSubmoduleChange(f)
+      )
       if (changes.length !== 1 || changes[0].path !== '.gitignore') {
         record(
           'skipped',

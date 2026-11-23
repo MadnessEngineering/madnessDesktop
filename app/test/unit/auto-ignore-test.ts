@@ -23,6 +23,17 @@ const modified = (path: string) => ({
   path,
   status: { kind: AppFileStatusKind.Modified },
 })
+const submodule = (path: string, commitChanged: boolean) => ({
+  path,
+  status: {
+    kind: AppFileStatusKind.Modified,
+    submoduleStatus: {
+      commitChanged,
+      modifiedChanges: !commitChanged,
+      untrackedChanges: !commitChanged,
+    },
+  },
+})
 
 describe('auto-ignore', () => {
   describe('isValidStandardPattern', () => {
@@ -104,6 +115,30 @@ describe('auto-ignore', () => {
       assert.strictEqual(
         findLoneAutoIgnoreMatch(
           [untracked('a/.claude_temp/b'), modified('README.md')],
+          patterns
+        ),
+        null
+      )
+    })
+
+    it('looks past submodule bumps and dirty submodules', () => {
+      assert.deepStrictEqual(
+        findLoneAutoIgnoreMatch(
+          [
+            submodule('Anathesmelt', false),
+            submodule('projects/tasker', true),
+            untracked('projects/mobile/.claude_temp/last_tool_use_id.txt'),
+          ],
+          patterns
+        ),
+        ['.claude_temp/']
+      )
+    })
+
+    it('returns null when submodules are the only changes', () => {
+      assert.strictEqual(
+        findLoneAutoIgnoreMatch(
+          [submodule('Anathesmelt', false), submodule('projects/tasker', true)],
           patterns
         ),
         null
